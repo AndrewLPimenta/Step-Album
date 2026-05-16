@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env.production
+.DS_Store
+*.log
+.turbo
+dist
+coverage
+.vscode
+.idea
+next-env.d.ts
+tsconfig.tsbuildinfo
+supabase/.temp/
