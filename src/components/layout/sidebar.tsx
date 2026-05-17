@@ -26,10 +26,13 @@ export function Sidebar({ role }: SidebarProps) {
     { href: "/fila", label: "Fila", icon: ListTodo },
   ];
   const adminNav = [
-    { href: "/financial", label: "Financeiro", icon: Wallet },
     { href: "/users", label: "Usuários", icon: Users },
   ];
-  const nav = role === "admin" ? [...baseNav, ...adminNav] : baseNav;
+  const nav = [
+    ...baseNav,
+    { href: "/financial", label: "Financeiro", icon: Wallet },
+    ...(role === "admin" ? adminNav : []),
+  ];
 
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 border-r border-border/50 backdrop-blur-md animate-in slide-in-from-left-5 fade-in duration-500">

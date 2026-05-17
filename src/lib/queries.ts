@@ -6,7 +6,7 @@ import type {
   AlbumType,
   UserRow,
 } from "@/types/database";
-import { ALBUM_VALUES } from "@/lib/constants";
+import { ALBUM_VALUES, DIAGRAMADOR_RATE } from "@/lib/constants";
 import { computePaymentCycle, toDateOnly } from "@/lib/financial";
 
 export interface AlbumWithRelations extends AlbumRow {
@@ -339,18 +339,59 @@ export interface CycleAlbum {
 }
 
 /**
- * Fetch all albums that count toward payment (enviado or concluido),
- * used to build cycle-based financial projections.
+ * Fetch all albums that count toward payment (enviado or concluido).
+ * Admins see all; diagramadores see only their own.
  */
-export async function listSentAlbums(): Promise<CycleAlbum[]> {
+export async function listSentAlbums(responsibleId?: string): Promise<CycleAlbum[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("albums")
     .select("id, student_name, value, responsible_id, payment_date, status")
     .in("status", ["enviado", "concluido"] as AlbumStatus[])
     .not("payment_date", "is", null)
     .order("payment_date", { ascending: false });
+  if (responsibleId) query = query.eq("responsible_id", responsibleId);
+  const { data } = await query;
   return (data ?? []) as unknown as CycleAlbum[];
+}
+
+export interface UserEarningsSummary {
+  userId: string;
+  name: string;
+  earnings: number;  // 40% of their albums' total value
+  total: number;     // 100% (raw value, for admin reference)
+  count: number;
+}
+
+/**
+ * Compute how much each non-admin user earns (40% of their albums).
+ * Returns sorted by earnings desc.
+ */
+export function computeDiagramadorEarnings(
+  albums: CycleAlbum[],
+  users: Pick<UserRow, "id" | "name" | "role">[],
+): UserEarningsSummary[] {
+  const diagramadores = users.filter((u) => u.role !== "admin");
+  const map = new Map<string, { name: string; total: number; count: number }>();
+  for (const u of diagramadores) map.set(u.id, { name: u.name, total: 0, count: 0 });
+
+  for (const a of albums) {
+    const entry = map.get(a.responsible_id);
+    if (!entry) continue;
+    entry.total += Number(a.value);
+    entry.count += 1;
+  }
+
+  return Array.from(map.entries())
+    .filter(([, v]) => v.count > 0)
+    .map(([uid, v]) => ({
+      userId: uid,
+      name: v.name,
+      earnings: v.total * DIAGRAMADOR_RATE,
+      total: v.total,
+      count: v.count,
+    }))
+    .sort((a, b) => b.earnings - a.earnings);
 }
 
 export interface CycleSummary {
@@ -358,16 +399,16 @@ export interface CycleSummary {
   label: string;
   total: number;
   count: number;
-  byUser: { name: string; total: number; count: number }[];
+  byUser: { name: string; total: number; earnings: number; count: number; isAdmin: boolean }[];
   isPast: boolean;
 }
 
 export function buildCycleSummaries(
   albums: CycleAlbum[],
-  users: Pick<UserRow, "id" | "name">[],
+  users: Pick<UserRow, "id" | "name" | "role">[],
   today: Date,
 ): CycleSummary[] {
-  const userMap = new Map(users.map((u) => [u.id, u.name]));
+  const userMap = new Map(users.map((u) => [u.id, u]));
   const cycleMap = new Map<
     string,
     { total: number; count: number; byUser: Map<string, { total: number; count: number }> }
@@ -397,11 +438,17 @@ export function buildCycleSummaries(
       label: computePaymentCycle(new Date(paymentDate + "T12:00:00")).label,
       total: entry.total,
       count: entry.count,
-      byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => ({
-        name: userMap.get(uid) ?? "Desconhecido",
-        total: v.total,
-        count: v.count,
-      })).sort((a, b) => b.total - a.total),
+      byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => {
+        const user = userMap.get(uid);
+        const isAdmin = user?.role === "admin";
+        return {
+          name: user?.name ?? "Desconhecido",
+          total: v.total,
+          earnings: isAdmin ? v.total : v.total * DIAGRAMADOR_RATE,
+          count: v.count,
+          isAdmin,
+        };
+      }).sort((a, b) => b.total - a.total),
       isPast: paymentDate < todayStr,
     }))
     .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));

@@ -38,8 +38,7 @@ const STATUS_LABEL_SHORT: Record<ActiveStatus, string> = {
 };
 
 export default async function FilaPage() {
-  const { profile } = await requireUser();
-  const isAdmin = profile.role === "admin";
+  await requireUser();
 
   const supabase = await createClient();
 
@@ -47,7 +46,7 @@ export default async function FilaPage() {
     supabase
       .from("albums")
       .select(
-        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at",
+        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id",
       )
       .neq("status", "concluido")
       .order("created_at", { ascending: false }),
@@ -68,6 +67,7 @@ export default async function FilaPage() {
     status: AlbumStatus;
     responsible_id: string;
     created_at: string;
+    kaz_id: string | null;
   };
 
   const albums = (albumsRes.data ?? []) as QueueAlbum[];
@@ -93,8 +93,7 @@ export default async function FilaPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Fila de trabalho</h1>
         <p className="text-sm text-muted-foreground">
-          {albums.length} álbum{albums.length !== 1 ? "ns" : ""} em andamento ·
-          veja quem está fazendo qual
+          {albums.length} álbum{albums.length !== 1 ? "ns" : ""} em andamento · veja quem está fazendo qual
         </p>
       </div>
 
@@ -132,7 +131,7 @@ export default async function FilaPage() {
 
       {/* Queue with search + multi-select */}
       {albums.length > 0 ? (
-        <FilaQueue albums={albums} users={selectUsers} isAdmin={isAdmin} />
+        <FilaQueue albums={albums} users={selectUsers} />
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-16 text-center">
           <FolderOpen className="h-8 w-8 text-muted-foreground/50 mb-3" />

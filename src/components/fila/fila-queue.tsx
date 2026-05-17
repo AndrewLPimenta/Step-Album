@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { Users, Search, X, ChevronDown } from "lucide-react";
+import { Users, Search, X, ChevronDown, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,6 +53,7 @@ export interface FilaAlbum {
   status: AlbumStatus;
   responsible_id: string;
   created_at: string;
+  kaz_id: string | null;
 }
 
 export interface FilaUser {
@@ -63,10 +64,9 @@ export interface FilaUser {
 interface Props {
   albums: FilaAlbum[];
   users: FilaUser[];
-  isAdmin: boolean;
 }
 
-export function FilaQueue({ albums, users, isAdmin }: Props) {
+export function FilaQueue({ albums, users }: Props) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -127,6 +127,47 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
     });
   }
 
+  function resolveKazId(a: FilaAlbum): string | null {
+    return a.kaz_id ?? null;
+  }
+
+  function handleDownload() {
+    const selectedAlbums = filtered.filter((a) => selected.has(a.id));
+
+    // Deduplicate by kaz_id (same student may appear more than once)
+    const seen = new Set<string>();
+    const toDownload: string[] = [];
+    let missing = 0;
+
+    for (const a of selectedAlbums) {
+      const kazId = resolveKazId(a);
+      if (!kazId) { missing++; continue; }
+      if (!seen.has(kazId)) { seen.add(kazId); toDownload.push(kazId); }
+    }
+
+    if (!toDownload.length) {
+      toast.error("Nenhum álbum selecionado tem código válido para download.");
+      return;
+    }
+
+    // Open synchronously via hidden <a> — avoids popup blocker
+    toDownload.forEach((kazId) => {
+      const numericId = kazId.replace(/^row_/, "");
+      const link = document.createElement("a");
+      link.href = `https://api-php.kazformaturas.com.br/apis/download_formando/${numericId}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    const msg = missing > 0
+      ? `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. ${missing} sem código ignorado${missing !== 1 ? "s" : ""}.`
+      : `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. Certifique-se de estar logado no Kaz.`;
+    toast.success(msg);
+  }
+
   function handleBulkReassign(userId: string) {
     const ids = Array.from(selected);
     const userName = users.find((u) => u.id === userId)?.name ?? "—";
@@ -167,18 +208,16 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
       ) : (
         <>
           {/* Select all row */}
-          {isAdmin && (
-            <div className="flex items-center gap-2 px-1">
-              <Checkbox
-                checked={allSelected}
-                onCheckedChange={toggleAll}
-                aria-label="Selecionar todos"
-              />
-              <span className="text-xs text-muted-foreground">
-                {someSelected ? `${selected.size} selecionado${selected.size !== 1 ? "s" : ""}` : `Selecionar todos (${filtered.length})`}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 px-1">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={toggleAll}
+              aria-label="Selecionar todos"
+            />
+            <span className="text-xs text-muted-foreground">
+              {someSelected ? `${selected.size} selecionado${selected.size !== 1 ? "s" : ""}` : `Selecionar todos (${filtered.length})`}
+            </span>
+          </div>
 
           {/* Album list grouped by user */}
           <div className="space-y-5">
@@ -206,13 +245,11 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
                             idx < userAlbums.length - 1 ? "border-b border-border/30" : ""
                           } ${isChecked ? "bg-accent/50" : "hover:bg-accent/30"}`}
                         >
-                          {isAdmin && (
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={() => toggleOne(album.id)}
-                              aria-label={`Selecionar ${album.student_name}`}
-                            />
-                          )}
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={() => toggleOne(album.id)}
+                            aria-label={`Selecionar ${album.student_name}`}
+                          />
                           {code ? (
                             <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">{code}</span>
                           ) : (
@@ -229,13 +266,11 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
                             <span className="text-xs text-muted-foreground w-16 text-right">
                               {TYPE_LABEL[album.type]}
                             </span>
-                            {isAdmin && (
-                              <ReassignSelect
-                                albumId={album.id}
-                                currentUserId={album.responsible_id}
-                                users={users}
-                              />
-                            )}
+                            <ReassignSelect
+                              albumId={album.id}
+                              currentUserId={album.responsible_id}
+                              users={users}
+                            />
                           </div>
                         </div>
                       );
@@ -253,13 +288,11 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
                           className={`rounded-lg border border-border/50 bg-card/30 px-3 py-2.5 space-y-1.5 ${isChecked ? "border-primary/40 bg-accent/30" : ""}`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            {isAdmin && (
-                              <Checkbox
-                                checked={isChecked}
-                                onCheckedChange={() => toggleOne(album.id)}
-                                className="mt-0.5 shrink-0"
-                              />
-                            )}
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={() => toggleOne(album.id)}
+                              className="mt-0.5 shrink-0"
+                            />
                             <div className="min-w-0 flex-1">
                               {code && <p className="text-xs font-mono text-muted-foreground">{code}</p>}
                               <p className="text-sm font-medium truncate">{album.student_name}</p>
@@ -269,16 +302,14 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
                               {STATUS_LABEL[album.status]}
                             </span>
                           </div>
-                          {isAdmin && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Reatribuir:</span>
-                              <ReassignSelect
-                                albumId={album.id}
-                                currentUserId={album.responsible_id}
-                                users={users}
-                              />
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Reatribuir:</span>
+                            <ReassignSelect
+                              albumId={album.id}
+                              currentUserId={album.responsible_id}
+                              users={users}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -291,7 +322,7 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
       )}
 
       {/* Bulk action bar */}
-      {someSelected && isAdmin && (
+      {someSelected && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-xl px-4 py-3">
           <span className="text-sm font-medium mr-1">
             {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
@@ -328,6 +359,17 @@ export function FilaQueue({ albums, users, isAdmin }: Props) {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+            disabled={isPending}
+            title="Baixar no Kaz (você precisa estar logado)"
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Baixar Kaz
+          </Button>
 
           <Button
             variant="ghost"

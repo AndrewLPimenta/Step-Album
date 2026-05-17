@@ -23,6 +23,7 @@ import {
 import {
   checkExistingCodesAction,
   createAlbumsBulkAction,
+  syncKazIdsAction,
 } from "@/server/actions/albums";
 import { ALBUM_TYPE_LABELS, ALL_ALBUM_TYPES } from "@/lib/constants";
 import type { AlbumType } from "@/types/database";
@@ -39,6 +40,7 @@ interface ParsedRow {
   student_name: string;
   faculty: string;
   type: AlbumType;
+  kaz_id?: string | null;
   isDuplicate?: boolean;
   duplicateSource?: "batch" | "db" | "both";
 }
@@ -58,6 +60,7 @@ function parseKazInput(text: string): Omit<ParsedRow, "isDuplicate" | "duplicate
           student_name: String(r.student_name),
           faculty: String(r.faculty ?? ""),
           type: "faculdade" as AlbumType,
+          kaz_id: r.kaz_id ? String(r.kaz_id) : null,
         }));
     } catch {
       return [];
@@ -123,6 +126,7 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
   const [responsibleId, setResponsibleId] = useState(diagramadores[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
   const [isParsing, startParse] = useTransition();
+  const [isSyncing, startSync] = useTransition();
 
   function handleParse() {
     const parsed = parseKazInput(rawText);
@@ -197,6 +201,32 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
     });
   }
 
+  function handleSync() {
+    const itemsWithId = rows
+      .filter((r) => r.kaz_id)
+      .map((r) => ({ class_code: r.class_code, student_code: r.student_code, kaz_id: r.kaz_id! }));
+    if (!itemsWithId.length) {
+      toast.error("Nenhum álbum neste lote tem ID Kaz.");
+      return;
+    }
+    startSync(async () => {
+      const result = await syncKazIdsAction(itemsWithId);
+      if (result.ok) {
+        const { updated, notFound } = result.data!;
+        const msg = notFound > 0
+          ? `${updated} ID${updated !== 1 ? "s" : ""} sincronizado${updated !== 1 ? "s" : ""}. ${notFound} não encontrado${notFound !== 1 ? "s" : ""} no sistema.`
+          : `${updated} ID${updated !== 1 ? "s" : ""} Kaz sincronizado${updated !== 1 ? "s" : ""} com sucesso!`;
+        toast[notFound > 0 ? "warning" : "success"](msg);
+        setOpen(false);
+        setStep("paste");
+        setRawText("");
+        setRows([]);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   function handleOpenChange(v: boolean) {
     setOpen(v);
     if (!v) {
@@ -207,6 +237,7 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
   }
 
   const duplicateCount = rows.filter((r) => r.isDuplicate).length;
+  const kazIdCount = rows.filter((r) => r.kaz_id).length;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -322,6 +353,9 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Turma</th>
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Código</th>
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Tipo</th>
+                    {kazIdCount > 0 && (
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">ID Kaz</th>
+                    )}
                     <th className="w-6" />
                   </tr>
                 </thead>
@@ -358,6 +392,11 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
                           </SelectContent>
                         </Select>
                       </td>
+                      {kazIdCount > 0 && (
+                        <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">
+                          {row.kaz_id ?? <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                      )}
                       <td className="px-2 py-1.5">
                         {row.isDuplicate && row.duplicateSource && (
                           <span title={DUPLICATE_LABEL[row.duplicateSource]}>
@@ -371,25 +410,44 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
               </table>
             </div>
 
-            <div className="flex gap-2 justify-between">
+            <div className="flex gap-2 justify-between flex-wrap">
               <Button
                 variant="ghost"
                 onClick={() => setStep("paste")}
-                disabled={isPending}
+                disabled={isPending || isSyncing}
               >
                 <ArrowLeft className="h-4 w-4" />
                 Voltar
               </Button>
-              <Button onClick={handleImport} disabled={isPending || !responsibleId}>
-                {isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Importando...
-                  </>
-                ) : (
-                  `Importar ${rows.length} álbum${rows.length !== 1 ? "s" : ""}`
+              <div className="flex gap-2">
+                {kazIdCount > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSync}
+                    disabled={isPending || isSyncing}
+                    title={`Atualiza o ID Kaz de ${kazIdCount} álbum${kazIdCount !== 1 ? "s" : ""} já existentes no sistema`}
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Sincronizando...
+                      </>
+                    ) : (
+                      `Sincronizar ${kazIdCount} ID${kazIdCount !== 1 ? "s" : ""} Kaz`
+                    )}
+                  </Button>
                 )}
-              </Button>
+                <Button onClick={handleImport} disabled={isPending || isSyncing || !responsibleId}>
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importando...
+                    </>
+                  ) : (
+                    `Importar ${rows.length} álbum${rows.length !== 1 ? "s" : ""}`
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         )}

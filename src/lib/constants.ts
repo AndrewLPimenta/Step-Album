@@ -66,6 +66,8 @@ export const ALL_ALBUM_STATUSES: AlbumStatus[] = [
   "concluido",
 ];
 
+export const DIAGRAMADOR_RATE = 0.40;
+
 export const ALL_PROBLEM_TYPES: ProblemType[] = [
   "formando_duplicado",
   "fotos_insuficientes",

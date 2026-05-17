@@ -107,12 +107,7 @@ export async function updateAlbumAction(
   }
   const { id, ...rest } = parsed.data;
 
-  // Only admins can reassign or change type freely; diagramadores can only
-  // edit their own albums (RLS already enforces) and cannot change responsible_id.
   const supabase = await createClient();
-  if (session.profile.role !== "admin" && rest.responsible_id) {
-    delete (rest as Record<string, unknown>).responsible_id;
-  }
 
   const update: Record<string, unknown> = { ...rest };
   if (rest.student_name) update.student_name = rest.student_name.trim();
@@ -229,6 +224,7 @@ export async function createAlbumsBulkAction(
     student_code: string;
     type: string;
     responsible_id: string;
+    kaz_id?: string | null;
   }>,
 ): Promise<ActionResult<{ count: number; duplicates: number }>> {
   const session = await requireUser();
@@ -252,6 +248,7 @@ export async function createAlbumsBulkAction(
     responsible_id: item.responsible_id,
     status: "baixado" as const,
     notes: null,
+    kaz_id: item.kaz_id ?? null,
     value: ALBUM_VALUES[item.type as AlbumType],
     cycle_start: toDateOnly(cycle.cycleStart),
     cycle_end: toDateOnly(cycle.cycleEnd),
@@ -404,6 +401,41 @@ export async function deleteProblemAction(
   await logAudit(session.profile.id, "problem.delete", "album_problem", problemId);
   revalidatePath(`/albums/${albumId}`);
   return { ok: true };
+}
+
+export async function syncKazIdsAction(
+  items: Array<{ class_code: string; student_code: string; kaz_id: string }>,
+): Promise<ActionResult<{ updated: number; notFound: number }>> {
+  const session = await requireUser();
+  const validItems = items.filter((i) => i.class_code && i.student_code && i.kaz_id);
+  if (!validItems.length) return { ok: false, error: "Nenhum item com ID Kaz para sincronizar." };
+
+  const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabaseAny = supabase as any;
+  const results = await Promise.all(
+    validItems.map(async (item) => {
+      const { data } = await supabaseAny
+        .from("albums")
+        .update({ kaz_id: item.kaz_id })
+        .eq("class_code", item.class_code)
+        .eq("student_code", item.student_code)
+        .select("id");
+      return (data as Array<{ id: string }> | null)?.length ?? 0;
+    }),
+  );
+
+  const updated = results.reduce((sum, n) => sum + n, 0);
+
+  await logAudit(session.profile.id, "album.sync_kaz_ids", "album", null, {
+    count: validItems.length,
+    updated,
+  });
+
+  revalidatePath("/albums");
+  revalidatePath("/fila");
+  return { ok: true, data: { updated, notFound: validItems.length - updated } };
 }
 
 export async function bulkUpdateStatusAction(
