@@ -462,6 +462,27 @@ export async function bulkUpdateStatusAction(
     console.error("[bulkUpdateStatus] error:", error);
     return { ok: false, error: "Não foi possível atualizar os álbuns." };
   }
+
+  // Quando marcado como inutilizável, cria problema vinculado automaticamente
+  const problemTypeMap: Partial<Record<import("@/types/database").AlbumStatus, import("@/types/database").ProblemType>> = {
+    fotos_insuficientes: "fotos_insuficientes",
+    duplicado: "formando_duplicado",
+  };
+  const problemType = problemTypeMap[status];
+  if (problemType) {
+    const problems = ids.map((albumId) => ({
+      album_id: albumId,
+      type: problemType,
+      description: status === "fotos_insuficientes"
+        ? "Fotos insuficientes — álbum não será utilizado neste ciclo."
+        : "Formando duplicado — esta é a cópia descartada.",
+      resolved: false,
+      reported_by: session.profile.id,
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("album_problems").insert(problems);
+  }
+
   await logAudit(session.profile.id, "album.bulk_status", "album", null, { ids, status });
   revalidatePath("/fila");
   revalidatePath("/albums");
@@ -489,4 +510,26 @@ export async function bulkReassignAction(
   revalidatePath("/fila");
   revalidatePath("/albums");
   return { ok: true };
+}
+
+/**
+ * Deleta álbuns inutilizáveis (fotos_insuficientes / duplicado) cujo ciclo já encerrou.
+ * Chamado automaticamente no carregamento da fila.
+ */
+export async function cleanupExpiredInutilizaveisAction(): Promise<ActionResult<{ deleted: number }>> {
+  await requireUser();
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc("cleanup_cycle_excluded_albums");
+  if (error) {
+    console.error("[cleanup] error:", error);
+    return { ok: false, error: "Falha na limpeza automática." };
+  }
+  const deleted = (data as number) ?? 0;
+  if (deleted > 0) {
+    revalidatePath("/fila");
+    revalidatePath("/albums");
+    revalidatePath("/dashboard");
+  }
+  return { ok: true, data: { deleted } };
 }

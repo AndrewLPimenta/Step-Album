@@ -16,6 +16,10 @@ const STATUS_STYLES: Record<AlbumStatus, string> = {
     "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30",
   concluido:
     "bg-success/15 text-success border-success/30",
+  fotos_insuficientes:
+    "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
+  duplicado:
+    "bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30",
 };
 
 export function StatusBadge({

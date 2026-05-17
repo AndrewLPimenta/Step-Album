@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Lock, TrendingUp, Clock, CheckCircle2, ChevronRight, Users } from "lucide-react";
 import { formatBRL, formatDate, computePaymentCycle, toDateOnly } from "@/lib/financial";
 import { DIAGRAMADOR_RATE } from "@/lib/constants";
+import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
 import type { UserRow } from "@/types/database";
 
 function daysUntil(dateStr: string, today: Date): number {
@@ -106,9 +107,10 @@ export default async function FinancialPage() {
                 <p className="text-3xl font-bold tabular-nums">
                   {formatBRL(displayValue(closedSummary.total))}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {closedSummary.count} álbum{closedSummary.count !== 1 ? "ns" : ""} enviado{closedSummary.count !== 1 ? "s" : ""}
-                </p>
+                  <PaymentAlbumsButton date={prevPaymentDate} total={closedSummary.total} count={closedSummary.count} albums={closedSummary.albums} />
+                </div>
                 {isAdmin && closedSummary.byUser.length > 0 && (
                   <div className="space-y-1 pt-1 border-t border-border/40">
                     {closedSummary.byUser.map((u) => (
@@ -149,10 +151,11 @@ export default async function FinancialPage() {
             <p className="text-3xl font-bold tabular-nums">
               {formatBRL(displayValue(openSummary?.total ?? 0))}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {openSummary?.count ?? 0} álbum{(openSummary?.count ?? 0) !== 1 ? "ns" : ""} enviado{(openSummary?.count ?? 0) !== 1 ? "s" : ""}
               {" · "}cresce conforme envios
-            </p>
+              {openSummary && <PaymentAlbumsButton date={currentPaymentDate} total={openSummary.total} count={openSummary.count} albums={openSummary.albums} />}
+            </div>
             {isAdmin && openSummary && openSummary.byUser.length > 0 && (
               <div className="space-y-1 pt-1 border-t border-border/40">
                 {openSummary.byUser.map((u) => (

@@ -207,6 +207,8 @@ export type Database = {
         | "montado"
         | "enviado"
         | "concluido"
+        | "fotos_insuficientes"
+        | "duplicado"
       album_type: "colab" | "faculdade" | "especial" | "medicina"
       problem_type:
         | "formando_duplicado"

@@ -26,6 +26,8 @@ export const ALBUM_STATUS_LABELS: Record<AlbumStatus, string> = {
   montado: "Montado",
   enviado: "Enviado",
   concluido: "Concluído",
+  fotos_insuficientes: "Fotos insuficientes",
+  duplicado: "Cópia / Duplicado",
 };
 
 export const ALBUM_STATUS_ORDER: AlbumStatus[] = [
@@ -35,6 +37,13 @@ export const ALBUM_STATUS_ORDER: AlbumStatus[] = [
   "montado",
   "enviado",
   "concluido",
+  "fotos_insuficientes",
+  "duplicado",
+];
+
+export const INUTILIZAVEL_STATUSES: AlbumStatus[] = [
+  "fotos_insuficientes",
+  "duplicado",
 ];
 
 export const PROBLEM_LABELS: Record<ProblemType, string> = {
@@ -64,6 +73,8 @@ export const ALL_ALBUM_STATUSES: AlbumStatus[] = [
   "montado",
   "enviado",
   "concluido",
+  "fotos_insuficientes",
+  "duplicado",
 ];
 
 export const DIAGRAMADOR_RATE = 0.40;

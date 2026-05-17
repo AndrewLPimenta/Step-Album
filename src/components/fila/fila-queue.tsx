@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useRef, useCallback } from "react";
 import { Users, Search, X, ChevronDown, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ const STATUS_LABEL: Record<AlbumStatus, string> = {
   enviado: "Enviado",
   concluido: "Concluído",
   descartado: "Descartado",
+  fotos_insuficientes: "Fotos insuf.",
+  duplicado: "Cópia",
 };
 
 const STATUS_CLASS: Record<AlbumStatus, string> = {
@@ -32,6 +34,8 @@ const STATUS_CLASS: Record<AlbumStatus, string> = {
   montado: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   enviado: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   concluido: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  fotos_insuficientes: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  duplicado: "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400",
 };
 
 const TYPE_LABEL: Record<AlbumType, string> = {
@@ -41,7 +45,9 @@ const TYPE_LABEL: Record<AlbumType, string> = {
   medicina: "Medicina",
 };
 
-const BULK_STATUSES: AlbumStatus[] = ["baixado", "descartado", "editando", "montado", "enviado", "concluido"];
+const ACTIVE_STATUSES: AlbumStatus[] = ["baixado", "editando", "montado", "enviado", "concluido", "descartado"];
+const INUTILIZAVEL_STATUSES: AlbumStatus[] = ["fotos_insuficientes", "duplicado"];
+const BULK_STATUSES: AlbumStatus[] = [...ACTIVE_STATUSES, ...INUTILIZAVEL_STATUSES];
 
 export interface FilaAlbum {
   id: string;
@@ -70,6 +76,7 @@ export function FilaQueue({ albums, users }: Props) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+  const lastClickedIndexRef = useRef<number | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -92,6 +99,12 @@ export function FilaQueue({ albums, users }: Props) {
     return map;
   }, [filtered]);
 
+  const filteredIndexMap = useMemo(() => {
+    const m = new Map<string, number>();
+    filtered.forEach((a, i) => m.set(a.id, i));
+    return m;
+  }, [filtered]);
+
   const activeUsers = users.filter((u) => albumsByUser.has(u.id));
   const allFilteredIds = filtered.map((a) => a.id);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
@@ -105,14 +118,27 @@ export function FilaQueue({ albums, users }: Props) {
     }
   }
 
-  function toggleOne(id: string) {
+  const toggleOne = useCallback((id: string, index: number, shiftKey: boolean) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (shiftKey && lastClickedIndexRef.current !== null) {
+        const from = Math.min(lastClickedIndexRef.current, index);
+        const to = Math.max(lastClickedIndexRef.current, index);
+        const selecting = !prev.has(id);
+        for (let i = from; i <= to; i++) {
+          const rangeId = filtered[i]?.id;
+          if (!rangeId) continue;
+          if (selecting) next.add(rangeId);
+          else next.delete(rangeId);
+        }
+      } else {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      }
       return next;
     });
-  }
+    lastClickedIndexRef.current = index;
+  }, [filtered]);
 
   function handleBulkStatus(status: AlbumStatus) {
     const ids = Array.from(selected);
@@ -238,18 +264,24 @@ export function FilaQueue({ albums, users }: Props) {
                     {userAlbums.map((album, idx) => {
                       const code = [album.class_code, album.student_code].filter(Boolean).join("·") || null;
                       const isChecked = selected.has(album.id);
+                      const flatIndex = filteredIndexMap.get(album.id) ?? 0;
                       return (
                         <div
                           key={album.id}
-                          className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
+                          className={`flex items-center gap-3 px-4 py-2.5 transition-colors select-none ${
                             idx < userAlbums.length - 1 ? "border-b border-border/30" : ""
                           } ${isChecked ? "bg-accent/50" : "hover:bg-accent/30"}`}
                         >
-                          <Checkbox
-                            checked={isChecked}
-                            onCheckedChange={() => toggleOne(album.id)}
-                            aria-label={`Selecionar ${album.student_name}`}
-                          />
+                          <div
+                            onClick={(e) => toggleOne(album.id, flatIndex, e.shiftKey)}
+                            className="cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={isChecked}
+                              aria-label={`Selecionar ${album.student_name}`}
+                              tabIndex={-1}
+                            />
+                          </div>
                           {code ? (
                             <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">{code}</span>
                           ) : (
@@ -282,17 +314,19 @@ export function FilaQueue({ albums, users }: Props) {
                     {userAlbums.map((album) => {
                       const code = [album.class_code, album.student_code].filter(Boolean).join("·") || null;
                       const isChecked = selected.has(album.id);
+                      const flatIndex = filteredIndexMap.get(album.id) ?? 0;
                       return (
                         <div
                           key={album.id}
-                          className={`rounded-lg border border-border/50 bg-card/30 px-3 py-2.5 space-y-1.5 ${isChecked ? "border-primary/40 bg-accent/30" : ""}`}
+                          className={`rounded-lg border border-border/50 bg-card/30 px-3 py-2.5 space-y-1.5 select-none ${isChecked ? "border-primary/40 bg-accent/30" : ""}`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={() => toggleOne(album.id)}
-                              className="mt-0.5 shrink-0"
-                            />
+                            <div
+                              onClick={(e) => toggleOne(album.id, flatIndex, e.shiftKey)}
+                              className="cursor-pointer mt-0.5 shrink-0"
+                            >
+                              <Checkbox checked={isChecked} tabIndex={-1} />
+                            </div>
                             <div className="min-w-0 flex-1">
                               {code && <p className="text-xs font-mono text-muted-foreground">{code}</p>}
                               <p className="text-sm font-medium truncate">{album.student_name}</p>

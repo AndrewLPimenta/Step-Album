@@ -32,6 +32,7 @@ import {
 } from "@/lib/constants";
 import { formatBRL, formatDate } from "@/lib/financial";
 import type { AlbumStatus, AlbumType } from "@/types/database";
+import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
 
 export default async function DashboardPage() {
   const { profile } = await requireUser();
@@ -179,8 +180,14 @@ export default async function DashboardPage() {
                   />
                   <div>
                     <div className="text-sm font-medium">{formatDate(p.date)}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {p.count} álbu{p.count === 1 ? "m" : "ns"}
+                      <PaymentAlbumsButton
+                        date={p.date}
+                        total={p.total}
+                        count={p.count}
+                        albums={p.albums}
+                      />
                     </div>
                   </div>
                 </div>

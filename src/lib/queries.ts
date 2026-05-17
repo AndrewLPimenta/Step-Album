@@ -153,16 +153,26 @@ export async function listAlbumsForAnalytics() {
   const { data } = await supabase
     .from("albums")
     .select(
-      "id, type, status, value, responsible_id, created_at, completed_at, payment_date, cycle_start, cycle_end",
+      "id, type, status, value, responsible_id, student_name, class_code, created_at, completed_at, payment_date, cycle_start, cycle_end",
     )
     .order("created_at", { ascending: false })
     .limit(1000);
-  return (data ?? []) as Pick<AlbumRow, "id" | "type" | "status" | "value" | "responsible_id" | "created_at" | "completed_at" | "payment_date" | "cycle_start" | "cycle_end">[];
+  return (data ?? []) as Pick<AlbumRow, "id" | "type" | "status" | "value" | "responsible_id" | "student_name" | "class_code" | "created_at" | "completed_at" | "payment_date" | "cycle_start" | "cycle_end">[];
 }
 
 // ---------------------------------------------------------------------------
 // Analytics aggregations
 // ---------------------------------------------------------------------------
+
+export interface PaymentAlbumItem {
+  id: string;
+  student_name: string;
+  class_code: string | null;
+  type: AlbumType;
+  status: AlbumStatus;
+  value: number;
+  responsibleName: string;
+}
 
 export interface DashboardStats {
   totalThisWeek: number;
@@ -174,7 +184,7 @@ export interface DashboardStats {
   byUser: { name: string; value: number }[];
   byType: { name: string; value: number }[];
   byStatus: { name: string; value: number }[];
-  nextPayments: { date: string; total: number; count: number }[];
+  nextPayments: { date: string; total: number; count: number; albums: PaymentAlbumItem[] }[];
 }
 
 interface AnalyticsAlbum {
@@ -183,6 +193,8 @@ interface AnalyticsAlbum {
   status: AlbumStatus;
   value: number;
   responsible_id: string;
+  student_name: string;
+  class_code: string | null;
   created_at: string;
   completed_at: string | null;
   payment_date: string | null;
@@ -220,7 +232,7 @@ export async function computeDashboardStats(
   const byUser = new Map<string, number>();
   const byType = new Map<AlbumType, number>();
   const byStatus = new Map<AlbumStatus, number>();
-  const nextPayments = new Map<string, { total: number; count: number }>();
+  const nextPayments = new Map<string, { total: number; count: number; albums: PaymentAlbumItem[] }>();
 
   for (const a of albums) {
     const created = new Date(a.created_at);
@@ -238,11 +250,20 @@ export async function computeDashboardStats(
     }
     byStatus.set(a.status, (byStatus.get(a.status) ?? 0) + 1);
 
-    if (a.payment_date && a.status !== "descartado") {
+    if (a.payment_date && (a.status === "enviado" || a.status === "concluido")) {
       const key = a.payment_date;
-      const cur = nextPayments.get(key) ?? { total: 0, count: 0 };
+      const cur = nextPayments.get(key) ?? { total: 0, count: 0, albums: [] };
       cur.total += Number(a.value);
       cur.count += 1;
+      cur.albums.push({
+        id: a.id,
+        student_name: a.student_name,
+        class_code: a.class_code,
+        type: a.type,
+        status: a.status,
+        value: Number(a.value),
+        responsibleName: userName.get(a.responsible_id) ?? "Desconhecido",
+      });
       nextPayments.set(key, cur);
     }
   }
@@ -265,7 +286,7 @@ export async function computeDashboardStats(
     byStatus: Array.from(byStatus.entries())
       .map(([k, v]) => ({ name: k, value: v })),
     nextPayments: Array.from(nextPayments.entries())
-      .map(([date, info]) => ({ date, total: info.total, count: info.count }))
+      .map(([date, info]) => ({ date, total: info.total, count: info.count, albums: info.albums }))
       .filter((p) => new Date(p.date) >= new Date(now.toDateString()))
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 4),
@@ -332,6 +353,8 @@ export function revenueByCycle(albums: AnalyticsAlbum[]) {
 export interface CycleAlbum {
   id: string;
   student_name: string;
+  class_code: string | null;
+  type: AlbumType;
   value: number;
   responsible_id: string;
   payment_date: string;
@@ -346,7 +369,7 @@ export async function listSentAlbums(responsibleId?: string): Promise<CycleAlbum
   const supabase = await createClient();
   let query = supabase
     .from("albums")
-    .select("id, student_name, value, responsible_id, payment_date, status")
+    .select("id, student_name, class_code, type, value, responsible_id, payment_date, status")
     .in("status", ["enviado", "concluido"] as AlbumStatus[])
     .not("payment_date", "is", null)
     .order("payment_date", { ascending: false });
@@ -401,6 +424,7 @@ export interface CycleSummary {
   count: number;
   byUser: { name: string; total: number; earnings: number; count: number; isAdmin: boolean }[];
   isPast: boolean;
+  albums: PaymentAlbumItem[];
 }
 
 export function buildCycleSummaries(
@@ -411,14 +435,14 @@ export function buildCycleSummaries(
   const userMap = new Map(users.map((u) => [u.id, u]));
   const cycleMap = new Map<
     string,
-    { total: number; count: number; byUser: Map<string, { total: number; count: number }> }
+    { total: number; count: number; byUser: Map<string, { total: number; count: number }>; albums: PaymentAlbumItem[] }
   >();
 
   for (const a of albums) {
     if (!a.payment_date) continue;
     const key = a.payment_date;
     if (!cycleMap.has(key)) {
-      cycleMap.set(key, { total: 0, count: 0, byUser: new Map() });
+      cycleMap.set(key, { total: 0, count: 0, byUser: new Map(), albums: [] });
     }
     const entry = cycleMap.get(key)!;
     entry.total += Number(a.value);
@@ -428,6 +452,15 @@ export function buildCycleSummaries(
     u.total += Number(a.value);
     u.count += 1;
     entry.byUser.set(uid, u);
+    entry.albums.push({
+      id: a.id,
+      student_name: a.student_name,
+      class_code: a.class_code,
+      type: a.type,
+      status: a.status,
+      value: Number(a.value),
+      responsibleName: userMap.get(uid)?.name ?? "Desconhecido",
+    });
   }
 
   const todayStr = toDateOnly(today);
@@ -438,6 +471,7 @@ export function buildCycleSummaries(
       label: computePaymentCycle(new Date(paymentDate + "T12:00:00")).label,
       total: entry.total,
       count: entry.count,
+      albums: entry.albums,
       byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => {
         const user = userMap.get(uid);
         const isAdmin = user?.role === "admin";
