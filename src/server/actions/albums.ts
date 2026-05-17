@@ -148,13 +148,14 @@ export async function updateAlbumStatusAction(
 
   const updatePayload: Record<string, unknown> = { status: parsed.data.status };
 
-  // When marked as "enviado", lock the payment cycle based on today's date
-  if (parsed.data.status === "enviado") {
+  // When marked as "enviado" or "concluido", lock the payment cycle
+  if (parsed.data.status === "enviado" || parsed.data.status === "concluido") {
     const now = new Date();
     const cycle = computePaymentCycle(now);
     updatePayload.cycle_start = toDateOnly(cycle.cycleStart);
     updatePayload.cycle_end = toDateOnly(cycle.cycleEnd);
     updatePayload.payment_date = toDateOnly(cycle.paymentDate);
+    updatePayload.completed_at = now.toISOString();
   }
 
   const { error } = await supabase
@@ -175,6 +176,7 @@ export async function updateAlbumStatusAction(
   revalidatePath("/albums");
   revalidatePath(`/albums/${parsed.data.id}`);
   revalidatePath("/dashboard");
+  revalidatePath("/fila");
   return { ok: true };
 }
 
@@ -401,5 +403,58 @@ export async function deleteProblemAction(
   }
   await logAudit(session.profile.id, "problem.delete", "album_problem", problemId);
   revalidatePath(`/albums/${albumId}`);
+  return { ok: true };
+}
+
+export async function bulkUpdateStatusAction(
+  ids: string[],
+  status: import("@/types/database").AlbumStatus,
+): Promise<ActionResult> {
+  const session = await requireUser();
+  if (!ids.length) return { ok: false, error: "Nenhum álbum selecionado." };
+
+  const supabase = await createClient();
+  const updatePayload: Record<string, unknown> = { status };
+
+  if (status === "enviado" || status === "concluido") {
+    const now = new Date();
+    const cycle = computePaymentCycle(now);
+    updatePayload.cycle_start = toDateOnly(cycle.cycleStart);
+    updatePayload.cycle_end = toDateOnly(cycle.cycleEnd);
+    updatePayload.payment_date = toDateOnly(cycle.paymentDate);
+    updatePayload.completed_at = now.toISOString();
+  }
+
+  const { error } = await supabase.from("albums").update(updatePayload).in("id", ids);
+  if (error) {
+    console.error("[bulkUpdateStatus] error:", error);
+    return { ok: false, error: "Não foi possível atualizar os álbuns." };
+  }
+  await logAudit(session.profile.id, "album.bulk_status", "album", null, { ids, status });
+  revalidatePath("/fila");
+  revalidatePath("/albums");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function bulkReassignAction(
+  ids: string[],
+  responsibleId: string,
+): Promise<ActionResult> {
+  const session = await requireUser();
+  if (!ids.length) return { ok: false, error: "Nenhum álbum selecionado." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("albums")
+    .update({ responsible_id: responsibleId })
+    .in("id", ids);
+  if (error) {
+    console.error("[bulkReassign] error:", error);
+    return { ok: false, error: "Não foi possível reatribuir os álbuns." };
+  }
+  await logAudit(session.profile.id, "album.bulk_reassign", "album", null, { ids, responsibleId });
+  revalidatePath("/fila");
+  revalidatePath("/albums");
   return { ok: true };
 }

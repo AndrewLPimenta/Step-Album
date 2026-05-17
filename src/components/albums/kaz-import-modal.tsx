@@ -46,6 +46,7 @@ interface ParsedRow {
 function parseKazInput(text: string): Omit<ParsedRow, "isDuplicate" | "duplicateSource">[] {
   const trimmed = text.trim();
 
+  // JSON from bookmarklet
   if (trimmed.startsWith("[")) {
     try {
       const json = JSON.parse(trimmed) as Array<Record<string, string>>;
@@ -63,14 +64,38 @@ function parseKazInput(text: string): Omit<ParsedRow, "isDuplicate" | "duplicate
     }
   }
 
+  const lines = trimmed.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  // Tab-separated (copy from HTML table preserving tabs)
+  if (lines.some((l) => l.includes("\t"))) {
+    const rows: Omit<ParsedRow, "isDuplicate" | "duplicateSource">[] = [];
+    for (const line of lines) {
+      const cols = line.split("\t");
+      const code = cols[1]?.trim() ?? "";
+      if (!/^\d{9}$/.test(code)) continue;
+      const name = cols[2]?.trim() ?? "";
+      const faculty = cols[3]?.trim() ?? "";
+      if (!name) continue;
+      rows.push({
+        class_code: code.slice(0, 5),
+        student_code: code.slice(5),
+        student_name: name,
+        faculty,
+        type: "faculdade",
+      });
+    }
+    return rows;
+  }
+
+  // Line-per-field format (copy-paste from Kaz page text)
+  // Each album: ..., "Não/Sim", <9-digit-code>, <name>, <faculty>, ...
   const rows: Omit<ParsedRow, "isDuplicate" | "duplicateSource">[] = [];
-  for (const line of trimmed.split("\n")) {
-    const cols = line.split("\t");
-    const code = cols[1]?.trim() ?? "";
-    if (!/^\d{9}$/.test(code)) continue;
-    const name = cols[2]?.trim() ?? "";
-    const faculty = cols[3]?.trim() ?? "";
-    if (!name) continue;
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\d{9}$/.test(lines[i])) continue;
+    const code = lines[i];
+    const name = lines[i + 1]?.trim() ?? "";
+    const faculty = lines[i + 2]?.trim() ?? "";
+    if (!name || /^\d+$/.test(name)) continue; // skip if next line is a number
     rows.push({
       class_code: code.slice(0, 5),
       student_code: code.slice(5),
@@ -78,6 +103,7 @@ function parseKazInput(text: string): Omit<ParsedRow, "isDuplicate" | "duplicate
       faculty,
       type: "faculdade",
     });
+    i += 2;
   }
   return rows;
 }

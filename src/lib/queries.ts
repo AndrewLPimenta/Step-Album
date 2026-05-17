@@ -226,7 +226,7 @@ export async function computeDashboardStats(
     const created = new Date(a.created_at);
     if (created >= weekStart) totalThisWeek++;
     if (created >= monthStart) totalThisMonth++;
-    if (a.status === "concluido") concluded++;
+    if (a.status === "concluido" || a.status === "enviado") concluded++;
     else if (a.status !== "descartado") inProgress++;
 
     if (a.status !== "descartado") {
