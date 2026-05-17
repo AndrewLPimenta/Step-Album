@@ -41,6 +41,14 @@ interface HeaderProps {
   role: UserRole;
 }
 
+const PAGE_LABELS: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/albums": "Álbuns",
+  "/fila": "Fila de Trabalho",
+  "/financial": "Financeiro",
+  "/users": "Usuários",
+};
+
 export function Header({ name, email, role }: HeaderProps) {
   const [isPending, startTransition] = useTransition();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -50,37 +58,34 @@ export function Header({ name, email, role }: HeaderProps) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/albums", label: "Álbuns", icon: FileImage },
     { href: "/fila", label: "Fila", icon: ListTodo },
-  ];
-  const adminNav = [
     { href: "/financial", label: "Financeiro", icon: Wallet },
-    { href: "/users", label: "Usuários", icon: UsersIcon },
   ];
+  const adminNav = [{ href: "/users", label: "Usuários", icon: UsersIcon }];
   const nav = role === "admin" ? [...baseNav, ...adminNav] : baseNav;
 
-  const handleLinkClick = () => {
-    setMobileMenuOpen(false);
-  };
+  const pageLabel = Object.entries(PAGE_LABELS).find(([path]) =>
+    pathname.startsWith(path),
+  )?.[1];
 
   return (
     <header
-      className="sticky top-0 z-30 flex items-center gap-3 border-b border-border/50 bg-background/80 backdrop-blur-md px-4 md:px-6"
+      className="sticky top-0 z-30 flex items-center gap-3 border-b border-border/40 bg-background/80 backdrop-blur-xl px-4 md:px-6"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         height: "calc(3.5rem + env(safe-area-inset-top))",
       }}
     >
-      {/* Mobile menu */}
+      {/* Mobile menu trigger */}
       <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" className="md:hidden h-10 w-10">
-            <Menu className="h-6 w-6" />
+          <Button variant="ghost" size="icon" className="md:hidden h-9 w-9">
+            <Menu className="h-5 w-5" />
           </Button>
         </DialogTrigger>
         <DialogContent className="left-0 top-0 translate-x-0 translate-y-0 h-dvh w-72 rounded-none sm:rounded-none p-0 flex flex-col overflow-hidden">
           <DialogTitle className="sr-only">Menu</DialogTitle>
-          {/* Cabeçalho do menu mobile */}
           <div
-            className="flex h-14 items-center gap-2.5 px-5 border-b border-border/50 shrink-0"
+            className="flex h-14 items-center gap-2.5 px-5 border-b border-border/40 shrink-0"
             style={{
               paddingTop: "env(safe-area-inset-top)",
               height: "calc(3.5rem + env(safe-area-inset-top))",
@@ -89,17 +94,13 @@ export function Header({ name, email, role }: HeaderProps) {
             <Image
               src="/logo-stepalbum.svg"
               alt="StepAlbum"
-              width={40}
-              height={40}
-              className="rounded-lg shrink-0"
+              width={36}
+              height={36}
+              className="rounded-xl shrink-0"
             />
-            <span className="text-2xl font-semibold tracking-tight">
-              StepAlbum
-            </span>
+            <span className="text-[15px] font-semibold tracking-tight">StepAlbum</span>
           </div>
-
-          {/* Links centralizados verticalmente */}
-          <nav className="flex-1 flex flex-col justify-center px-4 py-6 space-y-3.5">
+          <nav className="flex-1 flex flex-col justify-center px-4 py-6 space-y-1">
             {nav.map((item) => {
               const Icon = item.icon;
               const active =
@@ -108,19 +109,18 @@ export function Header({ name, email, role }: HeaderProps) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={handleLinkClick}
+                  onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200",
                     active
-                      ? "bg-[hsl(var(--brand-blue)/0.1)] text-[hsl(var(--brand-blue))] font-medium dark:bg-accent dark:text-accent-foreground"
+                      ? "bg-[hsl(var(--brand-blue)/0.1)] text-[hsl(var(--brand-blue))] font-medium"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )}
                 >
                   <Icon
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      active &&
-                        "text-[hsl(var(--brand-amber))] dark:text-accent-foreground",
+                      "h-[18px] w-[18px] shrink-0",
+                      active ? "text-[hsl(var(--brand-amber))]" : "text-muted-foreground/50",
                     )}
                   />
                   {item.label}
@@ -131,19 +131,26 @@ export function Header({ name, email, role }: HeaderProps) {
         </DialogContent>
       </Dialog>
 
+      {/* Page title — desktop */}
+      {pageLabel && (
+        <span className="hidden md:block text-sm font-medium text-foreground/70 tracking-tight">
+          {pageLabel}
+        </span>
+      )}
+
       <div className="flex-1" />
 
       <ThemeToggle />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-9 gap-2 px-2">
+          <Button variant="ghost" className="h-9 gap-2 px-2 rounded-xl">
             <Avatar className="h-7 w-7">
               <AvatarFallback
                 className="text-[11px] font-semibold text-white"
                 style={{
                   background:
-                    "linear-gradient(125deg, hsl(var(--brand-blue)) 0%, hsl(var(--brand-amber)) 100%)",
+                    "linear-gradient(135deg, hsl(var(--brand-blue)) 0%, hsl(var(--brand-amber)) 100%)",
                 }}
               >
                 {initials(name)}
@@ -155,9 +162,9 @@ export function Header({ name, email, role }: HeaderProps) {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-0.5">
-              <p className="text-sm font-medium text-foreground">{name}</p>
+              <p className="text-sm font-medium">{name}</p>
               <p className="text-xs text-muted-foreground truncate">{email}</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
+              <p className="text-xs text-muted-foreground/60 mt-0.5">
                 {USER_ROLE_LABELS[role]}
               </p>
             </div>

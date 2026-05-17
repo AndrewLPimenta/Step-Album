@@ -29,9 +29,9 @@
     --info-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    /* Brand ring: Amber #FFBF00 — subtle identity on focus */
+    /* Brand ring: Amber #FFBF00 */
     --ring: 45 100% 50%;
-    --radius: 0.65rem;
+    --radius: 0.7rem;
     --brand-blue: 225 73% 57%;
     --brand-amber: 45 100% 50%;
   }
@@ -43,7 +43,6 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 8% 7%;
     --popover-foreground: 0 0% 98%;
-    /* Dark mode keeps near-white primary for the minimal B&W feel */
     --primary: 0 0% 96%;
     --primary-foreground: 240 6% 10%;
     --secondary: 240 5% 12%;
@@ -62,7 +61,6 @@
     --info-foreground: 0 0% 100%;
     --border: 240 5% 18%;
     --input: 240 5% 18%;
-    /* Amber ring in dark mode too — consistent identity */
     --ring: 45 100% 50%;
     --brand-blue: 225 73% 57%;
     --brand-amber: 45 100% 50%;
@@ -79,10 +77,12 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    letter-spacing: -0.011em;
   }
 
-  /* Subtle gradient backdrop */
+  /* App backdrop */
   .app-backdrop {
     background:
       radial-gradient(
@@ -107,18 +107,24 @@
       hsl(var(--background));
   }
 
-
-  /* Glass card */
-  /* .glass {
-    @apply bg-card/60 backdrop-blur-md border border-border/60;
-  } */
+  /* Gradient text utility */
+  .gradient-text {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-blue)) 0%,
+      hsl(var(--brand-amber)) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 10px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--ring)); }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
 }

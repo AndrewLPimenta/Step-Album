@@ -167,18 +167,27 @@ export default async function DashboardPage() {
                 Nenhum pagamento previsto.
               </p>
             )}
-            {stats.nextPayments.map((p) => (
+            {stats.nextPayments.map((p, i) => (
               <div
                 key={p.date}
-                className="flex items-center justify-between rounded-lg border border-border/50 bg-card/30 px-3 py-2.5"
+                className="group flex items-center justify-between rounded-xl border border-border/40 bg-gradient-to-r from-card/60 to-card/30 px-4 py-3 transition-all duration-200 hover:border-[hsl(var(--brand-blue)/0.25)] hover:shadow-sm"
               >
-                <div>
-                  <div className="text-sm font-medium">{formatDate(p.date)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p.count} álbu{p.count === 1 ? "m" : "ns"}
+                <div className="flex items-center gap-3">
+                  <div
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: i === 0 ? "hsl(var(--brand-amber))" : "hsl(var(--brand-blue)/0.5)" }}
+                  />
+                  <div>
+                    <div className="text-sm font-medium">{formatDate(p.date)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.count} álbu{p.count === 1 ? "m" : "ns"}
+                    </div>
                   </div>
                 </div>
-                <div className="text-sm font-semibold tabular-nums">
+                <div
+                  className="text-sm font-bold tabular-nums bg-clip-text text-transparent"
+                  style={{ backgroundImage: "linear-gradient(135deg, hsl(var(--brand-blue)) 0%, hsl(var(--brand-amber)) 100%)" }}
+                >
                   {formatBRL(p.total)}
                 </div>
               </div>
@@ -198,11 +207,20 @@ export default async function DashboardPage() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-card/30 p-3">
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
-      <div className="text-[10px] text-muted-foreground uppercase tracking-wide mt-1">
+    <div className="group relative overflow-hidden rounded-xl border border-border/40 bg-card/40 p-4 text-center transition-all duration-200 hover:border-[hsl(var(--brand-blue)/0.2)] hover:shadow-sm">
+      <div
+        className="text-2xl font-bold tabular-nums tracking-tight bg-clip-text text-transparent"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, hsl(var(--brand-blue)) 0%, hsl(var(--brand-amber)) 100%)",
+        }}
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
         {label}
       </div>
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[hsl(var(--brand-blue)/0.4)] to-[hsl(var(--brand-amber)/0.4)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
     </div>
   );
 }
