@@ -433,6 +433,20 @@ export interface CycleSummary {
   albums: PaymentAlbumItem[];
 }
 
+// Compute the production cycle label from its payment date.
+// Payment on day 3 of month M → produced in month M-1 Cycle A (3rd→18th)
+// Payment on day 18 of month M → produced in month M-1 Cycle B (18th→3rd)
+function productionLabelFromPaymentDate(paymentDateStr: string): string {
+  const [year, month, day] = paymentDateStr.split("-").map(Number);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prodDay = day === 3 ? 3 : 18;
+  const prodDate = new Date(
+    `${prevYear}-${String(prevMonth).padStart(2, "0")}-${String(prodDay).padStart(2, "0")}T12:00:00`,
+  );
+  return computePaymentCycle(prodDate).label;
+}
+
 export function buildCycleSummaries(
   albums: CycleAlbum[],
   users: UserWithRate[],
@@ -474,7 +488,7 @@ export function buildCycleSummaries(
   return Array.from(cycleMap.entries())
     .map(([paymentDate, entry]) => ({
       paymentDate,
-      label: computePaymentCycle(new Date(paymentDate + "T12:00:00")).label,
+      label: productionLabelFromPaymentDate(paymentDate),
       total: entry.total,
       count: entry.count,
       albums: entry.albums,

@@ -66,25 +66,25 @@ export function computePaymentCycle(input: Date | string): PaymentCycle {
   let cycleEnd: Date;
   let paymentDate: Date;
 
-  if (day >= 3 && day <= 18) {
-    // Cycle A: 3rd to 18th inclusive
+  if (day >= 3 && day < 18) {
+    // Cycle A: 3rd to 17th (payment on 3rd of next month)
     cycleStart = makeLocalDate(year, month0, 3);
-    cycleEnd = makeLocalDate(year, month0, 19); // exclusive; last inclusive = 18th
+    cycleEnd = makeLocalDate(year, month0, 18);
     paymentDate = makeLocalDate(year, month0 + 1, 3);
-  } else if (day > 18) {
-    // Cycle B: 19th to next month's 3rd inclusive
-    cycleStart = makeLocalDate(year, month0, 19);
-    cycleEnd = makeLocalDate(year, month0 + 1, 4); // exclusive; last inclusive = 3rd
+  } else if (day >= 18) {
+    // Cycle B: 18th to next month's 2nd (payment on 18th of next month)
+    cycleStart = makeLocalDate(year, month0, 18);
+    cycleEnd = makeLocalDate(year, month0 + 1, 3);
     paymentDate = makeLocalDate(year, month0 + 1, 18);
   } else {
-    // day < 3 - tail of previous month's Cycle B (19th to 3rd)
-    cycleStart = makeLocalDate(year, month0 - 1, 19);
-    cycleEnd = makeLocalDate(year, month0, 4); // exclusive; last inclusive = 3rd
+    // day < 3 - tail of previous month's Cycle B
+    cycleStart = makeLocalDate(year, month0 - 1, 18);
+    cycleEnd = makeLocalDate(year, month0, 3);
     paymentDate = makeLocalDate(year, month0, 18);
   }
 
-  const lastDay = makeLocalDate(cycleEnd.getFullYear(), cycleEnd.getMonth(), cycleEnd.getDate() - 1);
-  const label = `${shortLabel(cycleStart)} → ${shortLabel(lastDay)}`;
+  const lastDay = cycleEnd;
+  const label = `${shortLabel(cycleStart)} → ${shortLabel(cycleEnd)}`;
 
   return { cycleStart, cycleEnd, lastDay, paymentDate, label };
 }
