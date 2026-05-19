@@ -14,11 +14,13 @@
 export interface PaymentCycle {
   /** First day of the cycle (inclusive) */
   cycleStart: Date;
-  /** Last day of the cycle (exclusive) */
+  /** Last day of the cycle (exclusive — used as next-cycle seed) */
   cycleEnd: Date;
+  /** Last day of the cycle (inclusive — used for display and countdowns) */
+  lastDay: Date;
   /** Date the album will be paid on */
   paymentDate: Date;
-  /** Human-readable cycle label, e.g. "03/Jan → 18/Jan" */
+  /** Human-readable cycle label, e.g. "03/mai → 18/mai" */
   label: string;
 }
 
@@ -64,26 +66,27 @@ export function computePaymentCycle(input: Date | string): PaymentCycle {
   let cycleEnd: Date;
   let paymentDate: Date;
 
-  if (day >= 3 && day < 18) {
-    // Cycle A
+  if (day >= 3 && day <= 18) {
+    // Cycle A: 3rd to 18th inclusive
     cycleStart = makeLocalDate(year, month0, 3);
-    cycleEnd = makeLocalDate(year, month0, 18);
+    cycleEnd = makeLocalDate(year, month0, 19); // exclusive; last inclusive = 18th
     paymentDate = makeLocalDate(year, month0 + 1, 3);
-  } else if (day >= 18) {
-    // Cycle B - starts in current month
-    cycleStart = makeLocalDate(year, month0, 18);
-    cycleEnd = makeLocalDate(year, month0 + 1, 3);
+  } else if (day > 18) {
+    // Cycle B: 19th to next month's 3rd inclusive
+    cycleStart = makeLocalDate(year, month0, 19);
+    cycleEnd = makeLocalDate(year, month0 + 1, 4); // exclusive; last inclusive = 3rd
     paymentDate = makeLocalDate(year, month0 + 1, 18);
   } else {
-    // day < 3 - tail of previous month's Cycle B
-    cycleStart = makeLocalDate(year, month0 - 1, 18);
-    cycleEnd = makeLocalDate(year, month0, 3);
+    // day < 3 - tail of previous month's Cycle B (19th to 3rd)
+    cycleStart = makeLocalDate(year, month0 - 1, 19);
+    cycleEnd = makeLocalDate(year, month0, 4); // exclusive; last inclusive = 3rd
     paymentDate = makeLocalDate(year, month0, 18);
   }
 
-  const label = `${shortLabel(cycleStart)} → ${shortLabel(cycleEnd)}`;
+  const lastDay = makeLocalDate(cycleEnd.getFullYear(), cycleEnd.getMonth(), cycleEnd.getDate() - 1);
+  const label = `${shortLabel(cycleStart)} → ${shortLabel(lastDay)}`;
 
-  return { cycleStart, cycleEnd, paymentDate, label };
+  return { cycleStart, cycleEnd, lastDay, paymentDate, label };
 }
 
 /**

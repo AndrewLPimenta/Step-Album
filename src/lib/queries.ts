@@ -378,25 +378,30 @@ export async function listSentAlbums(responsibleId?: string): Promise<CycleAlbum
   return (data ?? []) as unknown as CycleAlbum[];
 }
 
+type UserWithRate = Pick<UserRow, "id" | "name" | "role" | "commission_rate">;
+
+function getEffectiveRate(user: UserWithRate): number {
+  if (user.commission_rate !== null && user.commission_rate !== undefined) return user.commission_rate;
+  return user.role === "admin" ? 1.0 : DIAGRAMADOR_RATE;
+}
+
 export interface UserEarningsSummary {
   userId: string;
   name: string;
-  earnings: number;  // 40% of their albums' total value
-  total: number;     // 100% (raw value, for admin reference)
+  earnings: number;
+  total: number;
   count: number;
+  rate: number;
 }
 
-/**
- * Compute how much each non-admin user earns (40% of their albums).
- * Returns sorted by earnings desc.
- */
 export function computeDiagramadorEarnings(
   albums: CycleAlbum[],
-  users: Pick<UserRow, "id" | "name" | "role">[],
+  users: UserWithRate[],
 ): UserEarningsSummary[] {
-  const diagramadores = users.filter((u) => u.role !== "admin");
-  const map = new Map<string, { name: string; total: number; count: number }>();
-  for (const u of diagramadores) map.set(u.id, { name: u.name, total: 0, count: 0 });
+  // Include diagramadores + admins who have a custom commission_rate (e.g. Laura)
+  const commissioned = users.filter((u) => u.role !== "admin" || u.commission_rate !== null);
+  const map = new Map<string, { name: string; total: number; count: number; rate: number }>();
+  for (const u of commissioned) map.set(u.id, { name: u.name, total: 0, count: 0, rate: getEffectiveRate(u) });
 
   for (const a of albums) {
     const entry = map.get(a.responsible_id);
@@ -410,9 +415,10 @@ export function computeDiagramadorEarnings(
     .map(([uid, v]) => ({
       userId: uid,
       name: v.name,
-      earnings: v.total * DIAGRAMADOR_RATE,
+      earnings: v.total * v.rate,
       total: v.total,
       count: v.count,
+      rate: v.rate,
     }))
     .sort((a, b) => b.earnings - a.earnings);
 }
@@ -422,14 +428,14 @@ export interface CycleSummary {
   label: string;
   total: number;
   count: number;
-  byUser: { name: string; total: number; earnings: number; count: number; isAdmin: boolean }[];
+  byUser: { name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean }[];
   isPast: boolean;
   albums: PaymentAlbumItem[];
 }
 
 export function buildCycleSummaries(
   albums: CycleAlbum[],
-  users: Pick<UserRow, "id" | "name" | "role">[],
+  users: UserWithRate[],
   today: Date,
 ): CycleSummary[] {
   const userMap = new Map(users.map((u) => [u.id, u]));
@@ -475,12 +481,15 @@ export function buildCycleSummaries(
       byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => {
         const user = userMap.get(uid);
         const isAdmin = user?.role === "admin";
+        const isOwner = isAdmin && !user?.commission_rate;
+        const rate = user ? getEffectiveRate(user) : DIAGRAMADOR_RATE;
         return {
           name: user?.name ?? "Desconhecido",
           total: v.total,
-          earnings: isAdmin ? v.total : v.total * DIAGRAMADOR_RATE,
+          earnings: v.total * rate,
           count: v.count,
           isAdmin,
+          isOwner,
         };
       }).sort((a, b) => b.total - a.total),
       isPast: paymentDate < todayStr,

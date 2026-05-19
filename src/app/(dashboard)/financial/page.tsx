@@ -33,8 +33,8 @@ export default async function FinancialPage() {
   const today = new Date();
   const todayStr = toDateOnly(today);
 
-  const usersRes = await supabase.from("users").select("id, name, role").eq("active", true);
-  const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "role">[];
+  const usersRes = await supabase.from("users").select("id, name, role, commission_rate").eq("active", true);
+  const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "role" | "commission_rate">[];
 
   // Admins see all; diagramadores see only their own
   const sentAlbums = await listSentAlbums(isAdmin ? undefined : profile.id);
@@ -57,15 +57,18 @@ export default async function FinancialPage() {
     (s) => s.isPast && s.paymentDate !== currentPaymentDate && s.paymentDate !== prevPaymentDate,
   );
 
-  const daysUntilClose = daysUntil(toDateOnly(currentCycle.cycleEnd), today);
+  const daysUntilClose = daysUntil(toDateOnly(currentCycle.lastDay), today);
   const daysUntilOpen = openSummary ? daysUntil(currentPaymentDate, today) : null;
   const daysUntilClosed = closedSummary ? daysUntil(prevPaymentDate, today) : null;
 
   // Admin: all-time per-diagramador earnings
   const diagramadorEarnings = isAdmin ? computeDiagramadorEarnings(sentAlbums, users) : null;
 
+  const myUser = users.find((u) => u.id === profile.id);
+  const myRate = myUser?.commission_rate ?? (isAdmin ? 1.0 : DIAGRAMADOR_RATE);
+
   function displayValue(raw: number) {
-    return isAdmin ? raw : raw * DIAGRAMADOR_RATE;
+    return raw * myRate;
   }
 
   return (
@@ -73,9 +76,9 @@ export default async function FinancialPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
         <p className="text-sm text-muted-foreground">
-          {isAdmin
+          {isAdmin && !myUser?.commission_rate
             ? "Receita total por ciclo quinzenal"
-            : `Seus ganhos · ${Math.round(DIAGRAMADOR_RATE * 100)}% por álbum produzido`}
+            : `Seus ganhos · ${Math.round(myRate * 100)}% por álbum produzido`}
         </p>
       </div>
 
@@ -117,7 +120,9 @@ export default async function FinancialPage() {
                       <div key={u.name} className="flex justify-between text-xs">
                         <span className="text-muted-foreground">
                           {u.name}
-                          {!u.isAdmin && <span className="ml-1 opacity-50">(40%)</span>}
+                          {!u.isOwner && u.total > 0 && (
+                            <span className="ml-1 opacity-50">({Math.round((u.earnings / u.total) * 100)}%)</span>
+                          )}
                         </span>
                         <span className="font-medium tabular-nums">{formatBRL(u.earnings)}</span>
                       </div>
@@ -162,7 +167,9 @@ export default async function FinancialPage() {
                   <div key={u.name} className="flex justify-between text-xs">
                     <span className="text-muted-foreground">
                       {u.name}
-                      {!u.isAdmin && <span className="ml-1 opacity-50">(40%)</span>}
+                      {!u.isOwner && u.total > 0 && (
+                        <span className="ml-1 opacity-50">({Math.round((u.earnings / u.total) * 100)}%)</span>
+                      )}
                     </span>
                     <span className="font-medium tabular-nums text-[hsl(var(--brand-blue))]">
                       {formatBRL(u.earnings)}
@@ -209,13 +216,18 @@ export default async function FinancialPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
               <CardTitle className="text-base">Ganhos por diagramador</CardTitle>
             </div>
-            <CardDescription>40% do valor bruto de cada álbum produzido</CardDescription>
+            <CardDescription>Comissão por pessoa sobre o valor bruto produzido</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {diagramadorEarnings.map((u) => (
               <div key={u.userId} className="flex items-center justify-between rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
                 <div>
-                  <p className="text-sm font-medium">{u.name}</p>
+                  <p className="text-sm font-medium">
+                    {u.name}
+                    <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                      {Math.round(u.rate * 100)}%
+                    </span>
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {u.count} álbum{u.count !== 1 ? "ns" : ""} · valor bruto {formatBRL(u.total)}
                   </p>
@@ -259,7 +271,9 @@ export default async function FinancialPage() {
                       <span key={u.name} className="text-xs text-muted-foreground">
                         {u.name}:{" "}
                         <span className="font-medium text-foreground">{formatBRL(u.earnings)}</span>
-                        {!u.isAdmin && <span className="opacity-50"> (40%)</span>}
+                        {!u.isOwner && u.total > 0 && (
+                          <span className="opacity-50"> ({Math.round((u.earnings / u.total) * 100)}%)</span>
+                        )}
                       </span>
                     ))}
                   </div>

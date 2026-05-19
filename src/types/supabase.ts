@@ -153,6 +153,7 @@ export type Database = {
       users: {
         Row: {
           active: boolean
+          commission_rate: number | null
           created_at: string
           email: string
           id: string
@@ -162,6 +163,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          commission_rate?: number | null
           created_at?: string
           email: string
           id: string
@@ -171,6 +173,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          commission_rate?: number | null
           created_at?: string
           email?: string
           id?: string
