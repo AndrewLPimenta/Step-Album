@@ -334,8 +334,7 @@ export function revenueByCycle(albums: AnalyticsAlbum[]) {
         paymentDate: a.payment_date,
         total: 0,
         count: 0,
-        label: computePaymentCycle(new Date(a.payment_date + "T12:00:00"))
-          .label,
+        label: productionLabelFromPaymentDate(a.payment_date),
       };
     cur.total += Number(a.value);
     cur.count += 1;
