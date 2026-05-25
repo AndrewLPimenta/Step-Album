@@ -23,6 +23,14 @@ export const metadata: Metadata = {
   title: "StepAlbum · Painel Interno de Diagramação",
   description:
     "Painel operacional e financeiro para controle de diagramação de álbuns de formatura.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/logo-stepalbum.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/logo-stepalbum.svg",
+    apple: "/logo-stepalbum.svg",
+  },
 };
 
 export default function RootLayout({

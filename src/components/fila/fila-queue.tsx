@@ -99,13 +99,26 @@ export function FilaQueue({ albums, users }: Props) {
     return map;
   }, [filtered]);
 
-  const filteredIndexMap = useMemo(() => {
-    const m = new Map<string, number>();
-    filtered.forEach((a, i) => m.set(a.id, i));
-    return m;
-  }, [filtered]);
+  const activeUsers = useMemo(
+    () => users.filter((u) => albumsByUser.has(u.id)),
+    [users, albumsByUser],
+  );
 
-  const activeUsers = users.filter((u) => albumsByUser.has(u.id));
+  // Display order matches what's rendered: grouped by user, in users sort order.
+  // Range selection must use this order so shift+click stays within the visible range.
+  const displayOrderedAlbums = useMemo(() => {
+    const result: FilaAlbum[] = [];
+    for (const u of activeUsers) {
+      for (const a of albumsByUser.get(u.id) ?? []) result.push(a);
+    }
+    return result;
+  }, [activeUsers, albumsByUser]);
+
+  const displayIndexMap = useMemo(() => {
+    const m = new Map<string, number>();
+    displayOrderedAlbums.forEach((a, i) => m.set(a.id, i));
+    return m;
+  }, [displayOrderedAlbums]);
   const allFilteredIds = filtered.map((a) => a.id);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
   const someSelected = selected.size > 0;
@@ -126,7 +139,7 @@ export function FilaQueue({ albums, users }: Props) {
         const to = Math.max(lastClickedIndexRef.current, index);
         const selecting = !prev.has(id);
         for (let i = from; i <= to; i++) {
-          const rangeId = filtered[i]?.id;
+          const rangeId = displayOrderedAlbums[i]?.id;
           if (!rangeId) continue;
           if (selecting) next.add(rangeId);
           else next.delete(rangeId);
@@ -138,7 +151,7 @@ export function FilaQueue({ albums, users }: Props) {
       return next;
     });
     lastClickedIndexRef.current = index;
-  }, [filtered]);
+  }, [displayOrderedAlbums]);
 
   function handleBulkStatus(status: AlbumStatus) {
     const ids = Array.from(selected);
@@ -264,7 +277,7 @@ export function FilaQueue({ albums, users }: Props) {
                     {userAlbums.map((album, idx) => {
                       const code = [album.class_code, album.student_code].filter(Boolean).join("·") || null;
                       const isChecked = selected.has(album.id);
-                      const flatIndex = filteredIndexMap.get(album.id) ?? 0;
+                      const flatIndex = displayIndexMap.get(album.id) ?? 0;
                       return (
                         <div
                           key={album.id}
@@ -314,7 +327,7 @@ export function FilaQueue({ albums, users }: Props) {
                     {userAlbums.map((album) => {
                       const code = [album.class_code, album.student_code].filter(Boolean).join("·") || null;
                       const isChecked = selected.has(album.id);
-                      const flatIndex = filteredIndexMap.get(album.id) ?? 0;
+                      const flatIndex = displayIndexMap.get(album.id) ?? 0;
                       return (
                         <div
                           key={album.id}

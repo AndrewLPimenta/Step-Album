@@ -71,6 +71,24 @@ export default async function FinancialPage() {
     return raw * myRate;
   }
 
+  type ByUserEntry = { name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean };
+
+  // Merge all owner entries into a single "Step Album" row for display
+  function mergeOwners(byUser: ByUserEntry[]): ByUserEntry[] {
+    const owners = byUser.filter((u) => u.isOwner);
+    const others = byUser.filter((u) => !u.isOwner);
+    if (owners.length <= 1) return byUser;
+    const merged: ByUserEntry = {
+      name: "Step Album",
+      total: owners.reduce((s, u) => s + u.total, 0),
+      earnings: owners.reduce((s, u) => s + u.earnings, 0),
+      count: owners.reduce((s, u) => s + u.count, 0),
+      isAdmin: true,
+      isOwner: true,
+    };
+    return [merged, ...others];
+  }
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -116,7 +134,7 @@ export default async function FinancialPage() {
                 </div>
                 {isAdmin && closedSummary.byUser.length > 0 && (
                   <div className="space-y-1 pt-1 border-t border-border/40">
-                    {closedSummary.byUser.map((u) => (
+                    {mergeOwners(closedSummary.byUser).map((u) => (
                       <div key={u.name} className="flex justify-between text-xs">
                         <span className="text-muted-foreground">
                           {u.name}
@@ -163,7 +181,7 @@ export default async function FinancialPage() {
             </div>
             {isAdmin && openSummary && openSummary.byUser.length > 0 && (
               <div className="space-y-1 pt-1 border-t border-border/40">
-                {openSummary.byUser.map((u) => (
+                {mergeOwners(openSummary.byUser).map((u) => (
                   <div key={u.name} className="flex justify-between text-xs">
                     <span className="text-muted-foreground">
                       {u.name}
@@ -267,7 +285,7 @@ export default async function FinancialPage() {
                 </div>
                 {isAdmin && c.byUser.length > 1 && (
                   <div className="mt-2 pt-2 border-t border-border/30 flex flex-wrap gap-x-4 gap-y-1">
-                    {c.byUser.map((u) => (
+                    {mergeOwners(c.byUser).map((u) => (
                       <span key={u.name} className="text-xs text-muted-foreground">
                         {u.name}:{" "}
                         <span className="font-medium text-foreground">{formatBRL(u.earnings)}</span>

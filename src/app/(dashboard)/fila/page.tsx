@@ -10,6 +10,7 @@ import {
 import { FolderOpen, ImageOff, Copy } from "lucide-react";
 import type { AlbumStatus, AlbumType, UserRow } from "@/types/database";
 import { FilaQueue } from "@/components/fila/fila-queue";
+import { computePaymentCycle, toDateOnly } from "@/lib/financial";
 
 type ActiveStatus = Extract<AlbumStatus, "baixado" | "descartado" | "editando" | "montado" | "enviado">;
 
@@ -59,6 +60,9 @@ export default async function FilaPage() {
 
   const supabase = await createClient();
 
+  const currentCycle = computePaymentCycle(new Date());
+  const cycleStartStr = toDateOnly(currentCycle.cycleStart) + "T00:00:00";
+
   const [albumsRes, usersRes] = await Promise.all([
     supabase
       .from("albums")
@@ -66,6 +70,7 @@ export default async function FilaPage() {
         "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id",
       )
       .neq("status", "concluido")
+      .gte("created_at", cycleStartStr)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
@@ -105,7 +110,7 @@ export default async function FilaPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Fila de trabalho</h1>
         <p className="text-sm text-muted-foreground">
-          {activeAlbums.length} álbum{activeAlbums.length !== 1 ? "ns" : ""} em andamento · veja quem está fazendo qual
+          Ciclo {currentCycle.label} · {activeAlbums.length} álbum{activeAlbums.length !== 1 ? "ns" : ""} em andamento
         </p>
       </div>
 
@@ -195,7 +200,7 @@ export default async function FilaPage() {
               Cópias / Duplicados
             </h2>
             <span className="text-xs text-muted-foreground">
-              ({copias.length}) — não irão para a fila de eventos · removidos ao fim do ciclo
+              ({copias.length}) — removidos ao fim do ciclo
             </span>
           </div>
           <div className="rounded-lg border border-slate-200/60 dark:border-slate-700/40 overflow-hidden">
