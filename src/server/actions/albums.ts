@@ -516,6 +516,26 @@ export async function bulkReassignAction(
  * Deleta álbuns inutilizáveis (fotos_insuficientes / duplicado) cujo ciclo já encerrou.
  * Chamado automaticamente no carregamento da fila.
  */
+export async function bulkDeleteAction(ids: string[]): Promise<ActionResult> {
+  const session = await requireUser();
+  if (session.profile.role !== "admin") {
+    return { ok: false, error: "Apenas admins podem excluir álbuns." };
+  }
+  if (!ids.length) return { ok: false, error: "Nenhum álbum selecionado." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("albums").delete().in("id", ids);
+  if (error) {
+    console.error("[bulkDelete] error:", error);
+    return { ok: false, error: "Não foi possível excluir os álbuns." };
+  }
+  await logAudit(session.profile.id, "album.bulk_delete", "album", null, { ids, count: ids.length });
+  revalidatePath("/albums");
+  revalidatePath("/dashboard");
+  revalidatePath("/financial");
+  revalidatePath("/fila");
+  return { ok: true };
+}
+
 export async function cleanupExpiredInutilizaveisAction(): Promise<ActionResult<{ deleted: number }>> {
   await requireUser();
   const supabase = await createClient();

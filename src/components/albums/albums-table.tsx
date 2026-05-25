@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useRef, useCallback, useMemo, useTransition } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Table,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,10 +27,11 @@ import {
   ExternalLink,
   Trash2,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { formatDate } from "@/lib/financial";
 import { relativeTime } from "@/lib/utils";
-import { deleteAlbumAction } from "@/server/actions/albums";
+import { deleteAlbumAction, bulkDeleteAction } from "@/server/actions/albums";
 import { toast } from "sonner";
 import type { AlbumRow } from "@/types/database";
 
@@ -55,6 +57,42 @@ function albumLabel(album: AlbumTableRow) {
 
 export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
   const [isPending, startTransition] = useTransition();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const lastClickedIndexRef = useRef<number | null>(null);
+
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  function toggleAll() {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(allIds));
+  }
+
+  const toggleOne = useCallback(
+    (id: string, index: number, shiftKey: boolean) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (shiftKey && lastClickedIndexRef.current !== null) {
+          const from = Math.min(lastClickedIndexRef.current, index);
+          const to = Math.max(lastClickedIndexRef.current, index);
+          const selecting = !prev.has(id);
+          for (let i = from; i <= to; i++) {
+            const rangeId = rows[i]?.id;
+            if (!rangeId) continue;
+            if (selecting) next.add(rangeId);
+            else next.delete(rangeId);
+          }
+        } else {
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+        }
+        return next;
+      });
+      lastClickedIndexRef.current = index;
+    },
+    [rows],
+  );
 
   function handleDelete(id: string) {
     if (!confirm("Excluir este álbum? Esta ação é permanente.")) return;
@@ -62,6 +100,19 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
       const r = await deleteAlbumAction(id);
       if (!r.ok) toast.error(r.error);
       else toast.success("Álbum excluído");
+    });
+  }
+
+  function handleBulkDelete() {
+    if (!confirm(`Excluir ${selected.size} álbum${selected.size !== 1 ? "ns" : ""}? Esta ação é permanente e não pode ser desfeita.`)) return;
+    const ids = Array.from(selected);
+    startTransition(async () => {
+      const r = await bulkDeleteAction(ids);
+      if (!r.ok) toast.error(r.error);
+      else {
+        toast.success(`${ids.length} álbum${ids.length !== 1 ? "ns" : ""} excluído${ids.length !== 1 ? "s" : ""}`);
+        setSelected(new Set());
+      }
     });
   }
 
@@ -81,15 +132,38 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
     <>
       {/* ── Mobile: cards ── */}
       <div className="flex flex-col gap-3 md:hidden">
-        {rows.map((album) => {
+        {/* Select all (mobile) */}
+        <div className="flex items-center gap-2 px-1">
+          <Checkbox
+            checked={allSelected}
+            onCheckedChange={toggleAll}
+            aria-label="Selecionar todos"
+          />
+          <span className="text-xs text-muted-foreground">
+            {someSelected
+              ? `${selected.size} selecionado${selected.size !== 1 ? "s" : ""}`
+              : `Selecionar todos (${rows.length})`}
+          </span>
+        </div>
+
+        {rows.map((album, idx) => {
           const code = albumLabel(album);
+          const isChecked = selected.has(album.id);
           return (
             <div
               key={album.id}
-              className="rounded-xl border border-border/60 bg-card/40 p-4 space-y-3"
+              className={`rounded-xl border bg-card/40 p-4 space-y-3 select-none transition-colors ${
+                isChecked ? "border-primary/40 bg-accent/30" : "border-border/60"
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <div
+                  onClick={(e) => toggleOne(album.id, idx, e.shiftKey)}
+                  className="cursor-pointer mt-0.5 shrink-0"
+                >
+                  <Checkbox checked={isChecked} tabIndex={-1} />
+                </div>
+                <div className="min-w-0 flex-1">
                   {code && (
                     <p className="text-[11px] font-mono text-muted-foreground mb-0.5">
                       {code}
@@ -169,6 +243,15 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[40px]">
+                <div onClick={toggleAll} className="cursor-pointer">
+                  <Checkbox
+                    checked={allSelected}
+                    aria-label="Selecionar todos"
+                    tabIndex={-1}
+                  />
+                </div>
+              </TableHead>
               <TableHead>Código</TableHead>
               <TableHead>Formando</TableHead>
               <TableHead>Turma / evento</TableHead>
@@ -181,10 +264,26 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((album) => {
+            {rows.map((album, idx) => {
               const code = albumLabel(album);
+              const isChecked = selected.has(album.id);
               return (
-                <TableRow key={album.id} className="group">
+                <TableRow
+                  key={album.id}
+                  className={`group select-none ${isChecked ? "bg-accent/40" : ""}`}
+                >
+                  <TableCell>
+                    <div
+                      onClick={(e) => toggleOne(album.id, idx, e.shiftKey)}
+                      className="cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        aria-label={`Selecionar ${album.student_name}`}
+                        tabIndex={-1}
+                      />
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                     {code ?? "—"}
                   </TableCell>
@@ -265,6 +364,34 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-xl px-4 py-3">
+          <span className="text-sm font-medium mr-1">
+            {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
+          </span>
+          {isAdmin && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isPending}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Excluir
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelected(new Set())}
+            disabled={isPending}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
     </>
   );
 }
