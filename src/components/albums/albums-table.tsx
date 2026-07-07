@@ -214,7 +214,7 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
 
               <div className="flex flex-wrap items-center gap-2">
                 <StatusSelect albumId={album.id} status={album.status} />
-                <TypeBadge type={album.type} showValue />
+                <TypeBadge type={album.type} />
                 {album.responsible_name && (
                   <span className="text-xs text-muted-foreground">
                     {album.responsible_name}
@@ -308,7 +308,7 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
                     {album.faculty}
                   </TableCell>
                   <TableCell>
-                    <TypeBadge type={album.type} showValue />
+                    <TypeBadge type={album.type} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {album.responsible_name ?? "—"}
