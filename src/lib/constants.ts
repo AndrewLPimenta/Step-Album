@@ -77,7 +77,13 @@ export const ALL_ALBUM_STATUSES: AlbumStatus[] = [
   "duplicado",
 ];
 
-export const DIAGRAMADOR_RATE = 0.40;
+// Valor fixo pago ao diagramador por álbum produzido (independe do valor cobrado do cliente)
+export const DIAGRAMADOR_PAYOUTS: Record<AlbumType, number> = {
+  colab: 10,
+  faculdade: 15,
+  especial: 20,
+  medicina: 50,
+};
 
 export const ALL_PROBLEM_TYPES: ProblemType[] = [
   "formando_duplicado",

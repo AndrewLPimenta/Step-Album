@@ -6,7 +6,7 @@ import type {
   AlbumType,
   UserRow,
 } from "@/types/database";
-import { ALBUM_VALUES, DIAGRAMADOR_RATE } from "@/lib/constants";
+import { ALBUM_VALUES, DIAGRAMADOR_PAYOUTS } from "@/lib/constants";
 import { computePaymentCycle, toDateOnly } from "@/lib/financial";
 
 export interface AlbumWithRelations extends AlbumRow {
@@ -379,9 +379,14 @@ export async function listSentAlbums(responsibleId?: string): Promise<CycleAlbum
 
 type UserWithRate = Pick<UserRow, "id" | "name" | "role" | "commission_rate">;
 
-function getEffectiveRate(user: UserWithRate): number {
-  if (user.commission_rate !== null && user.commission_rate !== undefined) return user.commission_rate;
-  return user.role === "admin" ? 1.0 : DIAGRAMADOR_RATE;
+// "Dono": admin sem comissão configurada — recebe o valor cheio do álbum.
+// Qualquer outro (diagramador, ou admin com commission_rate setado, ex. Laura) recebe o valor fixo por tipo.
+function isCommissioned(user: UserWithRate): boolean {
+  return user.role !== "admin" || (user.commission_rate !== null && user.commission_rate !== undefined);
+}
+
+function albumEarning(user: UserWithRate, type: AlbumType, value: number): number {
+  return isCommissioned(user) ? DIAGRAMADOR_PAYOUTS[type] : value;
 }
 
 export interface UserEarningsSummary {
@@ -398,14 +403,15 @@ export function computeDiagramadorEarnings(
   users: UserWithRate[],
 ): UserEarningsSummary[] {
   // Include diagramadores + admins who have a custom commission_rate (e.g. Laura)
-  const commissioned = users.filter((u) => u.role !== "admin" || u.commission_rate !== null);
-  const map = new Map<string, { name: string; total: number; count: number; rate: number }>();
-  for (const u of commissioned) map.set(u.id, { name: u.name, total: 0, count: 0, rate: getEffectiveRate(u) });
+  const commissioned = users.filter(isCommissioned);
+  const map = new Map<string, { name: string; total: number; earnings: number; count: number }>();
+  for (const u of commissioned) map.set(u.id, { name: u.name, total: 0, earnings: 0, count: 0 });
 
   for (const a of albums) {
     const entry = map.get(a.responsible_id);
     if (!entry) continue;
     entry.total += Number(a.value);
+    entry.earnings += DIAGRAMADOR_PAYOUTS[a.type];
     entry.count += 1;
   }
 
@@ -414,10 +420,10 @@ export function computeDiagramadorEarnings(
     .map(([uid, v]) => ({
       userId: uid,
       name: v.name,
-      earnings: v.total * v.rate,
+      earnings: v.earnings,
       total: v.total,
       count: v.count,
-      rate: v.rate,
+      rate: v.total > 0 ? v.earnings / v.total : 0,
     }))
     .sort((a, b) => b.earnings - a.earnings);
 }
@@ -427,7 +433,7 @@ export interface CycleSummary {
   label: string;
   total: number;
   count: number;
-  byUser: { name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean }[];
+  byUser: { userId: string; name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean }[];
   isPast: boolean;
   albums: PaymentAlbumItem[];
 }
@@ -454,7 +460,7 @@ export function buildCycleSummaries(
   const userMap = new Map(users.map((u) => [u.id, u]));
   const cycleMap = new Map<
     string,
-    { total: number; count: number; byUser: Map<string, { total: number; count: number }>; albums: PaymentAlbumItem[] }
+    { total: number; count: number; byUser: Map<string, { total: number; earnings: number; count: number }>; albums: PaymentAlbumItem[] }
   >();
 
   for (const a of albums) {
@@ -467,8 +473,10 @@ export function buildCycleSummaries(
     entry.total += Number(a.value);
     entry.count += 1;
     const uid = a.responsible_id;
-    const u = entry.byUser.get(uid) ?? { total: 0, count: 0 };
+    const respUser = userMap.get(uid);
+    const u = entry.byUser.get(uid) ?? { total: 0, earnings: 0, count: 0 };
     u.total += Number(a.value);
+    u.earnings += respUser ? albumEarning(respUser, a.type, Number(a.value)) : Number(a.value);
     u.count += 1;
     entry.byUser.set(uid, u);
     entry.albums.push({
@@ -495,11 +503,11 @@ export function buildCycleSummaries(
         const user = userMap.get(uid);
         const isAdmin = user?.role === "admin";
         const isOwner = isAdmin && !user?.commission_rate;
-        const rate = user ? getEffectiveRate(user) : DIAGRAMADOR_RATE;
         return {
+          userId: uid,
           name: user?.name ?? "Desconhecido",
           total: v.total,
-          earnings: v.total * rate,
+          earnings: v.earnings,
           count: v.count,
           isAdmin,
           isOwner,

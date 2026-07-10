@@ -15,7 +15,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Lock, TrendingUp, Clock, CheckCircle2, ChevronRight, Users } from "lucide-react";
 import { formatBRL, formatDate, computePaymentCycle, toDateOnly } from "@/lib/financial";
-import { DIAGRAMADOR_RATE } from "@/lib/constants";
 import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
 import type { UserRow } from "@/types/database";
 
@@ -65,13 +64,16 @@ export default async function FinancialPage() {
   const diagramadorEarnings = isAdmin ? computeDiagramadorEarnings(sentAlbums, users) : null;
 
   const myUser = users.find((u) => u.id === profile.id);
-  const myRate = myUser?.commission_rate ?? (isAdmin ? 1.0 : DIAGRAMADOR_RATE);
+  const isOwner = isAdmin && !myUser?.commission_rate;
 
-  function displayValue(raw: number) {
-    return raw * myRate;
+  type ByUserEntry = { userId: string; name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean };
+
+  // Dono vê a receita bruta do ciclo; comissionado (diagramador ou admin com commission_rate) vê só o que ganhou.
+  function myEarnings(summary: { total: number; byUser: ByUserEntry[] } | null | undefined): number {
+    if (!summary) return 0;
+    if (isOwner) return summary.total;
+    return summary.byUser.find((u) => u.userId === profile.id)?.earnings ?? 0;
   }
-
-  type ByUserEntry = { name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean };
 
   // Merge all owner entries into a single "Step Album" row for display
   function mergeOwners(byUser: ByUserEntry[]): ByUserEntry[] {
@@ -79,6 +81,7 @@ export default async function FinancialPage() {
     const others = byUser.filter((u) => !u.isOwner);
     if (owners.length <= 1) return byUser;
     const merged: ByUserEntry = {
+      userId: "owners",
       name: "Step Album",
       total: owners.reduce((s, u) => s + u.total, 0),
       earnings: owners.reduce((s, u) => s + u.earnings, 0),
@@ -94,9 +97,9 @@ export default async function FinancialPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
         <p className="text-sm text-muted-foreground">
-          {isAdmin && !myUser?.commission_rate
+          {isOwner
             ? "Receita total por ciclo quinzenal"
-            : `Seus ganhos · ${Math.round(myRate * 100)}% por álbum produzido`}
+            : "Seus ganhos por álbum produzido"}
         </p>
       </div>
 
@@ -126,7 +129,7 @@ export default async function FinancialPage() {
             {closedSummary ? (
               <>
                 <p className="text-3xl font-bold tabular-nums">
-                  {formatBRL(displayValue(closedSummary.total))}
+                  {formatBRL(myEarnings(closedSummary))}
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {closedSummary.count} álbum{closedSummary.count !== 1 ? "ns" : ""} enviado{closedSummary.count !== 1 ? "s" : ""}
@@ -172,7 +175,7 @@ export default async function FinancialPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-3xl font-bold tabular-nums">
-              {formatBRL(displayValue(openSummary?.total ?? 0))}
+              {formatBRL(myEarnings(openSummary))}
             </p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {openSummary?.count ?? 0} álbum{(openSummary?.count ?? 0) !== 1 ? "ns" : ""} enviado{(openSummary?.count ?? 0) !== 1 ? "s" : ""}
@@ -207,7 +210,7 @@ export default async function FinancialPage() {
             <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
               <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
               <span className="text-xs">
-                <span className="font-semibold">{formatBRL(displayValue(closedSummary.total))}</span>
+                <span className="font-semibold">{formatBRL(myEarnings(closedSummary))}</span>
                 {" "}receber em{" "}
                 <span className="font-semibold">{formatDate(prevPaymentDate)}</span>
               </span>
@@ -217,7 +220,7 @@ export default async function FinancialPage() {
             <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
               <ChevronRight className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="text-xs">
-                <span className="font-semibold">{formatBRL(displayValue(openSummary.total))}</span>
+                <span className="font-semibold">{formatBRL(myEarnings(openSummary))}</span>
                 {" "}projetado para{" "}
                 <span className="font-semibold">{formatDate(currentPaymentDate)}</span>
               </span>
@@ -280,7 +283,7 @@ export default async function FinancialPage() {
                     </p>
                   </div>
                   <p className="text-sm font-semibold tabular-nums">
-                    {formatBRL(displayValue(c.total))}
+                    {formatBRL(myEarnings(c))}
                   </p>
                 </div>
                 {isAdmin && c.byUser.length > 1 && (
