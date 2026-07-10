@@ -57,7 +57,11 @@ export default async function AlbumsPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="flex gap-2">
-          {isAdmin && <KazImportModal diagramadores={diagramadores} />}
+          <KazImportModal
+            diagramadores={diagramadores}
+            currentUserId={profile.id}
+            isAdmin={isAdmin}
+          />
           <Button asChild>
             <Link href="/albums/new">
               <Plus className="h-4 w-4" />

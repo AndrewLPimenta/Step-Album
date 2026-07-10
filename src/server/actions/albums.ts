@@ -228,11 +228,15 @@ export async function createAlbumsBulkAction(
   }>,
 ): Promise<ActionResult<{ count: number; duplicates: number }>> {
   const session = await requireUser();
-  if (session.profile.role !== "admin") {
-    return { ok: false, error: "Apenas admins podem importar álbuns em lote." };
-  }
   if (!items.length) {
     return { ok: false, error: "Nenhum álbum para importar." };
+  }
+  // Diagramador só pode importar álbuns atribuídos a si mesmo
+  if (
+    session.profile.role !== "admin" &&
+    items.some((item) => item.responsible_id !== session.profile.id)
+  ) {
+    return { ok: false, error: "Você só pode importar álbuns para si mesmo." };
   }
 
   const supabase = await createClient();

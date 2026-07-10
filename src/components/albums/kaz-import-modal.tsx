@@ -117,13 +117,23 @@ const DUPLICATE_LABEL: Record<NonNullable<ParsedRow["duplicateSource"]>, string>
   both: "Código repetido no lote e no sistema",
 };
 
-export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[] }) {
+export function KazImportModal({
+  diagramadores,
+  currentUserId,
+  isAdmin,
+}: {
+  diagramadores: Diagramador[];
+  currentUserId: string;
+  isAdmin: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"paste" | "preview">("paste");
   const [rawText, setRawText] = useState("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [globalType, setGlobalType] = useState<AlbumType>("faculdade");
-  const [responsibleId, setResponsibleId] = useState(diagramadores[0]?.id ?? "");
+  const [responsibleId, setResponsibleId] = useState(
+    isAdmin ? diagramadores[0]?.id ?? "" : currentUserId,
+  );
   const [isPending, startTransition] = useTransition();
   const [isParsing, startParse] = useTransition();
   const [isSyncing, startSync] = useTransition();
@@ -329,7 +339,11 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
               </div>
               <div className="space-y-1.5 min-w-[160px]">
                 <Label>Responsável</Label>
-                <Select value={responsibleId} onValueChange={setResponsibleId}>
+                <Select
+                  value={responsibleId}
+                  onValueChange={setResponsibleId}
+                  disabled={!isAdmin}
+                >
                   <SelectTrigger className="h-8">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
@@ -341,6 +355,11 @@ export function KazImportModal({ diagramadores }: { diagramadores: Diagramador[]
                     ))}
                   </SelectContent>
                 </Select>
+                {!isAdmin && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Apenas admins podem importar para outra pessoa.
+                  </p>
+                )}
               </div>
             </div>
 
