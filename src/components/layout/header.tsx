@@ -10,6 +10,7 @@ import {
   Users as UsersIcon,
   FileImage,
   ListTodo,
+  Target,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -46,6 +47,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/albums": "Álbuns",
   "/fila": "Fila de Trabalho",
   "/financial": "Financeiro",
+  "/metas": "Metas",
   "/users": "Usuários",
 };
 
@@ -59,6 +61,7 @@ export function Header({ name, email, role }: HeaderProps) {
     { href: "/albums", label: "Álbuns", icon: FileImage },
     { href: "/fila", label: "Fila", icon: ListTodo },
     { href: "/financial", label: "Financeiro", icon: Wallet },
+    { href: "/metas", label: "Metas", icon: Target },
   ];
   const adminNav = [{ href: "/users", label: "Usuários", icon: UsersIcon }];
   const nav = role === "admin" ? [...baseNav, ...adminNav] : baseNav;

@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ALL_ALBUM_STATUSES,
   ALL_ALBUM_TYPES,
+  ALL_GOAL_TYPES,
   ALL_PROBLEM_TYPES,
 } from "./constants";
 
@@ -59,3 +60,12 @@ export const userUpdateSchema = z.object({
   active: z.boolean().optional(),
 });
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
+
+export const goalSchema = z.object({
+  goal_type: z.enum(ALL_GOAL_TYPES as [string, ...string[]]),
+  goal_value: z
+    .number()
+    .positive("A meta precisa ser maior que zero")
+    .max(1_000_000, "Valor muito alto"),
+});
+export type GoalInput = z.infer<typeof goalSchema>;

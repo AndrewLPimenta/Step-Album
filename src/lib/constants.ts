@@ -92,3 +92,12 @@ export const ALL_PROBLEM_TYPES: ProblemType[] = [
   "arquivos_corrompidos",
   "outro",
 ];
+
+export type GoalType = "valor" | "albuns";
+
+export const ALL_GOAL_TYPES: GoalType[] = ["valor", "albuns"];
+
+export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
+  valor: "Valor a receber (R$)",
+  albuns: "Quantidade de álbuns",
+};

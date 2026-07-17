@@ -29,6 +29,48 @@ function makeLocalDate(year: number, month0: number, day: number): Date {
   return new Date(year, month0, day, 0, 0, 0, 0);
 }
 
+const BRAZIL_TIME_ZONE = "America/Sao_Paulo";
+
+/**
+ * Converts a real instant into a Date whose local getters (getDate/getMonth/
+ * getFullYear/getHours/...) report the wall-clock date/time in
+ * America/Sao_Paulo, regardless of the timezone the JS runtime itself is
+ * configured with (server functions commonly run in UTC). Payment cycles are
+ * defined by Brazilian calendar days, so any "now" fed into
+ * computePaymentCycle must go through this first. Brazil has used a fixed
+ * UTC-3 offset (no DST) since 2019, so the shift is constant and
+ * order-preserving — safe for range comparisons too, as long as both sides
+ * of the comparison go through the same conversion.
+ */
+export function toBrazilTime(d: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BRAZIL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return new Date(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second"),
+    0,
+  );
+}
+
+/** Current date/time as Brazilian wall-clock components (see toBrazilTime). */
+export function nowBR(): Date {
+  return toBrazilTime(new Date());
+}
+
 const MONTH_NAMES_PT = [
   "jan",
   "fev",
@@ -89,6 +131,26 @@ export function computePaymentCycle(input: Date | string): PaymentCycle {
   return { cycleStart, cycleEnd, lastDay, paymentDate, label };
 }
 
+/** Cycles turn over at this hour (Brasília time) on days 03 and 18, not at midnight. */
+const CYCLE_CUTOFF_HOUR = 18;
+
+/**
+ * Resolves which payment cycle a real moment (e.g. "now", or the instant an
+ * album was marked as sent) belongs to. An album sent at 10:00 on the 18th
+ * still belongs to the cycle that's about to close; one sent at 19:00
+ * already belongs to the new one. We model this by shifting the Brazilian
+ * wall-clock instant back by the cutoff hour before reading off its calendar
+ * day, then reusing the (hour-agnostic) day-based rule above. Only use this
+ * for real instants — for calendar-day markers (e.g. chaining cycleEnd into
+ * the next cycle, or building a label from a payment date) use
+ * computePaymentCycle directly, since those don't carry a meaningful hour.
+ */
+export function computePaymentCycleForInstant(instant: Date): PaymentCycle {
+  const brazilNow = toBrazilTime(instant);
+  const shifted = new Date(brazilNow.getTime() - CYCLE_CUTOFF_HOUR * 60 * 60 * 1000);
+  return computePaymentCycle(shifted);
+}
+
 /**
  * Returns an ISO date string (YYYY-MM-DD) without timezone shifting.
  * Used when persisting to Supabase `date` columns.
@@ -137,7 +199,7 @@ export function cycleKey(d: Date | string): string {
 /**
  * Build "current" and "next" cycle bounds based on a reference date (default: today).
  */
-export function getCurrentAndNextCycle(reference: Date = new Date()) {
+export function getCurrentAndNextCycle(reference: Date = nowBR()) {
   const current = computePaymentCycle(reference);
   // Next cycle starts where current ends
   const next = computePaymentCycle(current.cycleEnd);

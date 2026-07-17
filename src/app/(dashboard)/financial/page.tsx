@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Lock, TrendingUp, Clock, CheckCircle2, ChevronRight, Users } from "lucide-react";
-import { formatBRL, formatDate, computePaymentCycle, toDateOnly } from "@/lib/financial";
+import { formatBRL, formatDate, computePaymentCycle, computePaymentCycleForInstant, nowBR, toDateOnly } from "@/lib/financial";
 import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
 import type { UserRow } from "@/types/database";
 
@@ -29,7 +29,7 @@ export default async function FinancialPage() {
   const isAdmin = profile.role === "admin";
 
   const supabase = await createClient();
-  const today = new Date();
+  const today = nowBR();
   const todayStr = toDateOnly(today);
 
   const usersRes = await supabase.from("users").select("id, name, role, commission_rate").eq("active", true);
@@ -39,7 +39,7 @@ export default async function FinancialPage() {
   const sentAlbums = await listSentAlbums(isAdmin ? undefined : profile.id);
   const summaries = buildCycleSummaries(sentAlbums, users, today);
 
-  const currentCycle = computePaymentCycle(today);
+  const currentCycle = computePaymentCycleForInstant(new Date());
   const currentPaymentDate = toDateOnly(currentCycle.paymentDate);
 
   const dayBeforeStart = new Date(currentCycle.cycleStart);
@@ -60,8 +60,9 @@ export default async function FinancialPage() {
   const daysUntilOpen = openSummary ? daysUntil(currentPaymentDate, today) : null;
   const daysUntilClosed = closedSummary ? daysUntil(prevPaymentDate, today) : null;
 
-  // Admin: all-time per-diagramador earnings
-  const diagramadorEarnings = isAdmin ? computeDiagramadorEarnings(sentAlbums, users) : null;
+  // Admin: per-diagramador earnings within the current (open) cycle only
+  const currentCycleAlbums = sentAlbums.filter((a) => a.payment_date === currentPaymentDate);
+  const diagramadorEarnings = isAdmin ? computeDiagramadorEarnings(currentCycleAlbums, users) : null;
 
   const myUser = users.find((u) => u.id === profile.id);
   const isOwner = isAdmin && !myUser?.commission_rate;
@@ -237,7 +238,7 @@ export default async function FinancialPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
               <CardTitle className="text-base">Ganhos por diagramador</CardTitle>
             </div>
-            <CardDescription>Comissão por pessoa sobre o valor bruto produzido</CardDescription>
+            <CardDescription>Comissão por pessoa no ciclo {currentCycle.label}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {diagramadorEarnings.map((u) => (
@@ -250,7 +251,7 @@ export default async function FinancialPage() {
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {u.count} álbum{u.count !== 1 ? "ns" : ""} · valor bruto {formatBRL(u.total)}
+                    {u.count} álbum{u.count !== 1 ? "ns" : ""}
                   </p>
                 </div>
                 <p className="text-sm font-semibold tabular-nums text-green-600 dark:text-green-400">

@@ -13,3 +13,16 @@ export type UserRow         = Database["public"]["Tables"]["users"]["Row"];
 export type AlbumRow        = Database["public"]["Tables"]["albums"]["Row"];
 export type AlbumProblemRow = Database["public"]["Tables"]["album_problems"]["Row"];
 export type AuditLogRow     = Database["public"]["Tables"]["audit_logs"]["Row"];
+
+// `user_goals` isn't in the generated Database type (same situation as the
+// `kaz_id` column — the generated types file isn't regenerated on every
+// migration), so it's declared by hand here.
+export type GoalType = "valor" | "albuns";
+export interface UserGoalRow {
+  id: string;
+  user_id: string;
+  goal_type: GoalType;
+  goal_value: number;
+  created_at: string;
+  updated_at: string;
+}

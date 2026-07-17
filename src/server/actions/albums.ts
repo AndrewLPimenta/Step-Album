@@ -14,7 +14,7 @@ import {
   type ProblemCreateInput,
 } from "@/lib/validations";
 import { ALBUM_VALUES } from "@/lib/constants";
-import { computePaymentCycle, toDateOnly } from "@/lib/financial";
+import { computePaymentCycleForInstant, toDateOnly } from "@/lib/financial";
 import type { ActionResult } from "./auth";
 import type { AlbumType } from "@/types/database";
 
@@ -58,8 +58,7 @@ export async function createAlbumAction(
   }
 
   const supabase = await createClient();
-  const now = new Date();
-  const cycle = computePaymentCycle(now);
+  const cycle = computePaymentCycleForInstant(new Date());
 
   const { data, error } = await supabase
     .from("albums")
@@ -146,7 +145,7 @@ export async function updateAlbumStatusAction(
   // When marked as "enviado" or "concluido", lock the payment cycle
   if (parsed.data.status === "enviado" || parsed.data.status === "concluido") {
     const now = new Date();
-    const cycle = computePaymentCycle(now);
+    const cycle = computePaymentCycleForInstant(now);
     updatePayload.cycle_start = toDateOnly(cycle.cycleStart);
     updatePayload.cycle_end = toDateOnly(cycle.cycleEnd);
     updatePayload.payment_date = toDateOnly(cycle.paymentDate);
@@ -240,8 +239,7 @@ export async function createAlbumsBulkAction(
   }
 
   const supabase = await createClient();
-  const now = new Date();
-  const cycle = computePaymentCycle(now);
+  const cycle = computePaymentCycleForInstant(new Date());
 
   const rows = items.map((item) => ({
     student_name: item.student_name.trim(),
@@ -454,7 +452,7 @@ export async function bulkUpdateStatusAction(
 
   if (status === "enviado" || status === "concluido") {
     const now = new Date();
-    const cycle = computePaymentCycle(now);
+    const cycle = computePaymentCycleForInstant(now);
     updatePayload.cycle_start = toDateOnly(cycle.cycleStart);
     updatePayload.cycle_end = toDateOnly(cycle.cycleEnd);
     updatePayload.payment_date = toDateOnly(cycle.paymentDate);

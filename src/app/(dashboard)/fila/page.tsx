@@ -10,7 +10,7 @@ import {
 import { FolderOpen, ImageOff, Copy } from "lucide-react";
 import type { AlbumStatus, AlbumType, UserRow } from "@/types/database";
 import { FilaQueue } from "@/components/fila/fila-queue";
-import { computePaymentCycle, toDateOnly } from "@/lib/financial";
+import { computePaymentCycleForInstant, toDateOnly } from "@/lib/financial";
 
 type ActiveStatus = Extract<AlbumStatus, "baixado" | "descartado" | "editando" | "montado" | "enviado">;
 
@@ -60,7 +60,7 @@ export default async function FilaPage() {
 
   const supabase = await createClient();
 
-  const currentCycle = computePaymentCycle(new Date());
+  const currentCycle = computePaymentCycleForInstant(new Date());
   const cycleStartStr = toDateOnly(currentCycle.cycleStart) + "T00:00:00";
 
   const [albumsRes, usersRes] = await Promise.all([

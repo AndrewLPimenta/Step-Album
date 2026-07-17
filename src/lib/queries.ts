@@ -4,10 +4,11 @@ import type {
   AlbumRow,
   AlbumStatus,
   AlbumType,
+  UserGoalRow,
   UserRow,
 } from "@/types/database";
 import { ALBUM_VALUES, DIAGRAMADOR_PAYOUTS } from "@/lib/constants";
-import { computePaymentCycle, toDateOnly } from "@/lib/financial";
+import { computePaymentCycle, computePaymentCycleForInstant, nowBR, toBrazilTime, toDateOnly } from "@/lib/financial";
 
 export interface AlbumWithRelations extends AlbumRow {
   responsible_name: string | null;
@@ -219,7 +220,7 @@ export async function computeDashboardStats(
   albums: AnalyticsAlbum[],
   users: Pick<UserRow, "id" | "name">[],
 ): Promise<DashboardStats> {
-  const now = new Date();
+  const now = nowBR();
   const weekStart = startOfWeek(now);
   const monthStart = startOfMonth(now);
 
@@ -235,7 +236,7 @@ export async function computeDashboardStats(
   const nextPayments = new Map<string, { total: number; count: number; albums: PaymentAlbumItem[] }>();
 
   for (const a of albums) {
-    const created = new Date(a.created_at);
+    const created = toBrazilTime(new Date(a.created_at));
     if (created >= weekStart) totalThisWeek++;
     if (created >= monthStart) totalThisMonth++;
     if (a.status === "concluido" || a.status === "enviado") concluded++;
@@ -377,15 +378,15 @@ export async function listSentAlbums(responsibleId?: string): Promise<CycleAlbum
   return (data ?? []) as unknown as CycleAlbum[];
 }
 
-type UserWithRate = Pick<UserRow, "id" | "name" | "role" | "commission_rate">;
+export type UserWithRate = Pick<UserRow, "id" | "name" | "role" | "commission_rate">;
 
 // "Dono": admin sem comissão configurada — recebe o valor cheio do álbum.
 // Qualquer outro (diagramador, ou admin com commission_rate setado, ex. Laura) recebe o valor fixo por tipo.
-function isCommissioned(user: UserWithRate): boolean {
+export function isCommissioned(user: UserWithRate): boolean {
   return user.role !== "admin" || (user.commission_rate !== null && user.commission_rate !== undefined);
 }
 
-function albumEarning(user: UserWithRate, type: AlbumType, value: number): number {
+export function albumEarning(user: UserWithRate, type: AlbumType, value: number): number {
   return isCommissioned(user) ? DIAGRAMADOR_PAYOUTS[type] : value;
 }
 
@@ -513,7 +514,7 @@ export function buildCycleSummaries(
           isOwner,
         };
       }).sort((a, b) => b.total - a.total),
-      isPast: paymentDate < todayStr,
+      isPast: paymentDate <= todayStr,
     }))
     .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
 }
@@ -529,10 +530,48 @@ export function expectedValue(type: AlbumType): number {
  * Current cycle helper for header strip.
  */
 export function currentCycleInfo() {
-  const now = new Date();
-  const cycle = computePaymentCycle(now);
+  const cycle = computePaymentCycleForInstant(new Date());
   return {
     label: cycle.label,
     paymentDate: toDateOnly(cycle.paymentDate),
   };
+}
+
+// ---------------------------------------------------------------------------
+// User goals ("metas")
+// ---------------------------------------------------------------------------
+
+/**
+ * The user's ongoing personal goal, or null if they haven't set one. RLS
+ * restricts this to the caller's own row, so no explicit filter is needed
+ * beyond `.single()`-style lookup.
+ */
+export async function getMyGoal(userId: string): Promise<UserGoalRow | null> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
+    .from("user_goals")
+    .select("id, user_id, goal_type, goal_value, created_at, updated_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data as UserGoalRow | null) ?? null;
+}
+
+export interface GoalProgress {
+  earnings: number;
+  albumCount: number;
+}
+
+/**
+ * Lifetime totals (all sent/concluído albums) behind the goal progress bar —
+ * earnings via the same commission rule used on the /financial page, so the
+ * number the user sets a goal against matches what they'll actually receive.
+ */
+export async function getMyGoalProgress(user: UserWithRate): Promise<GoalProgress> {
+  const albums = await listSentAlbums(user.id);
+  let earnings = 0;
+  for (const a of albums) {
+    earnings += albumEarning(user, a.type, Number(a.value));
+  }
+  return { earnings, albumCount: albums.length };
 }

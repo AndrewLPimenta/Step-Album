@@ -9,6 +9,7 @@ import {
   Users,
   FileImage,
   ListTodo,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
@@ -28,6 +29,7 @@ export function Sidebar({ role }: SidebarProps) {
   const nav = [
     ...baseNav,
     { href: "/financial", label: "Financeiro", icon: Wallet },
+    { href: "/metas", label: "Metas", icon: Target },
     ...(role === "admin" ? [{ href: "/users", label: "Usuários", icon: Users }] : []),
   ];
 
