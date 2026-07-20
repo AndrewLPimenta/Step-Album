@@ -11,6 +11,7 @@ import {
   FileImage,
   ListTodo,
   Target,
+  Paperclip,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -48,6 +49,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/fila": "Fila de Trabalho",
   "/financial": "Financeiro",
   "/metas": "Metas",
+  "/arquivos": "Arquivos",
   "/users": "Usuários",
 };
 
@@ -62,6 +64,7 @@ export function Header({ name, email, role }: HeaderProps) {
     { href: "/fila", label: "Fila", icon: ListTodo },
     { href: "/financial", label: "Financeiro", icon: Wallet },
     { href: "/metas", label: "Metas", icon: Target },
+    { href: "/arquivos", label: "Arquivos", icon: Paperclip },
   ];
   const adminNav = [{ href: "/users", label: "Usuários", icon: UsersIcon }];
   const nav = role === "admin" ? [...baseNav, ...adminNav] : baseNav;

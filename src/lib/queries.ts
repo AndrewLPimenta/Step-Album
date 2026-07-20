@@ -4,6 +4,7 @@ import type {
   AlbumRow,
   AlbumStatus,
   AlbumType,
+  ArquivoRow,
   UserGoalRow,
   UserRow,
 } from "@/types/database";
@@ -574,4 +575,61 @@ export async function getMyGoalProgress(user: UserWithRate): Promise<GoalProgres
     earnings += albumEarning(user, a.type, Number(a.value));
   }
   return { earnings, albumCount: albums.length };
+}
+
+// ---------------------------------------------------------------------------
+// Arquivos (shared links/files library)
+// ---------------------------------------------------------------------------
+
+export interface ArquivoWithMeta extends ArquivoRow {
+  created_by_name: string | null;
+  download_url: string | null;
+}
+
+const ARQUIVO_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1h, regenerated on every page load
+
+/**
+ * All shared links/files, newest first. File entries get a short-lived
+ * signed URL generated here (server-side) instead of a public bucket URL —
+ * the bucket is private, so this is the only way to make a file openable.
+ */
+export async function listArquivos(): Promise<ArquivoWithMeta[]> {
+  const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rows } = (await (supabase as any)
+    .from("arquivos")
+    .select(
+      "id, title, description, category, kind, link_url, storage_path, file_name, file_size, mime_type, created_by, created_at, updated_at",
+    )
+    .order("created_at", { ascending: false })) as { data: ArquivoRow[] | null };
+  const { data: users } = (await supabase.from("users").select("id, name")) as {
+    data: Pick<UserRow, "id" | "name">[] | null;
+  };
+
+  const arquivos = rows ?? [];
+  const userName = new Map((users ?? []).map((u) => [u.id, u.name]));
+
+  const storagePaths = arquivos
+    .filter((a) => a.kind === "arquivo" && a.storage_path)
+    .map((a) => a.storage_path as string);
+
+  const signedUrlByPath = new Map<string, string>();
+  if (storagePaths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("arquivos")
+      .createSignedUrls(storagePaths, ARQUIVO_SIGNED_URL_TTL_SECONDS);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) signedUrlByPath.set(s.path, s.signedUrl);
+    }
+  }
+
+  return arquivos.map((a) => ({
+    ...a,
+    created_by_name: (a.created_by && userName.get(a.created_by)) || null,
+    download_url:
+      a.kind === "link"
+        ? a.link_url
+        : (a.storage_path && signedUrlByPath.get(a.storage_path)) || null,
+  }));
 }

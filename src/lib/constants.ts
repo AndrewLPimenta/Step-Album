@@ -101,3 +101,21 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   valor: "Valor a receber (R$)",
   albuns: "Quantidade de álbuns",
 };
+
+export type ArquivoCategoria = "contrato" | "tutorial" | "modelo" | "outro";
+
+export const ALL_ARQUIVO_CATEGORIAS: ArquivoCategoria[] = [
+  "contrato",
+  "tutorial",
+  "modelo",
+  "outro",
+];
+
+export const ARQUIVO_CATEGORIA_LABELS: Record<ArquivoCategoria, string> = {
+  contrato: "Contratos",
+  tutorial: "Tutoriais",
+  modelo: "Modelos",
+  outro: "Outros",
+};
+
+export const ARQUIVO_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB, matches the Storage bucket limit

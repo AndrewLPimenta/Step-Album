@@ -26,3 +26,22 @@ export interface UserGoalRow {
   created_at: string;
   updated_at: string;
 }
+
+// Same situation as `user_goals` — `arquivos` isn't in the generated types.
+export type ArquivoCategoria = "contrato" | "tutorial" | "modelo" | "outro";
+export type ArquivoKind = "arquivo" | "link";
+export interface ArquivoRow {
+  id: string;
+  title: string;
+  description: string | null;
+  category: ArquivoCategoria;
+  kind: ArquivoKind;
+  link_url: string | null;
+  storage_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}

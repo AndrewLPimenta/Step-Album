@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   ALL_ALBUM_STATUSES,
   ALL_ALBUM_TYPES,
+  ALL_ARQUIVO_CATEGORIAS,
   ALL_GOAL_TYPES,
   ALL_PROBLEM_TYPES,
+  ARQUIVO_MAX_FILE_SIZE_BYTES,
 } from "./constants";
 
 export const loginSchema = z.object({
@@ -69,3 +71,32 @@ export const goalSchema = z.object({
     .max(1_000_000, "Valor muito alto"),
 });
 export type GoalInput = z.infer<typeof goalSchema>;
+
+const arquivoBaseFields = {
+  title: z.string().min(2, "Título muito curto").max(150),
+  description: z.string().max(1000).optional().nullable(),
+  category: z.enum(ALL_ARQUIVO_CATEGORIAS as [string, ...string[]]),
+};
+
+export const arquivoLinkSchema = z.object({
+  ...arquivoBaseFields,
+  link_url: z.string().url("Link inválido"),
+});
+export type ArquivoLinkInput = z.infer<typeof arquivoLinkSchema>;
+
+export const arquivoFileSchema = z.object({
+  ...arquivoBaseFields,
+  storage_path: z.string().min(1),
+  file_name: z.string().min(1).max(255),
+  file_size: z.number().positive().max(ARQUIVO_MAX_FILE_SIZE_BYTES, "Arquivo muito grande"),
+  mime_type: z.string().min(1).max(255),
+});
+export type ArquivoFileInput = z.infer<typeof arquivoFileSchema>;
+
+export const arquivoUpdateSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(2).max(150).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  category: z.enum(ALL_ARQUIVO_CATEGORIAS as [string, ...string[]]).optional(),
+});
+export type ArquivoUpdateInput = z.infer<typeof arquivoUpdateSchema>;

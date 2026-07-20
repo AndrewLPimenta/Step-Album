@@ -10,6 +10,7 @@ import {
   FileImage,
   ListTodo,
   Target,
+  Paperclip,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
@@ -30,6 +31,7 @@ export function Sidebar({ role }: SidebarProps) {
     ...baseNav,
     { href: "/financial", label: "Financeiro", icon: Wallet },
     { href: "/metas", label: "Metas", icon: Target },
+    { href: "/arquivos", label: "Arquivos", icon: Paperclip },
     ...(role === "admin" ? [{ href: "/users", label: "Usuários", icon: Users }] : []),
   ];
 
