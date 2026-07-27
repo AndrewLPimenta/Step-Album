@@ -9,7 +9,7 @@ export const ALBUM_VALUES: Record<AlbumType, number> = {
   colab: 15,
   faculdade: 20,
   especial: 25,
-  medicina: 75,
+  medicina: 70,
 };
 
 export const ALBUM_TYPE_LABELS: Record<AlbumType, string> = {
