@@ -52,6 +52,9 @@ export default async function FinancialPage() {
   const closedSummary = prevIsUpcoming
     ? summaries.find((s) => s.paymentDate === prevPaymentDate)
     : null;
+  // No cap here on purpose — listSentAlbums() already brings back every
+  // sent/concluído album regardless of age, so this naturally covers the
+  // full history (6+ cycles) as it accumulates, not just a recent slice.
   const historySummaries = summaries.filter(
     (s) => s.isPast && s.paymentDate !== currentPaymentDate && s.paymentDate !== prevPaymentDate,
   );
@@ -75,6 +78,8 @@ export default async function FinancialPage() {
     if (isOwner) return summary.total;
     return summary.byUser.find((u) => u.userId === profile.id)?.earnings ?? 0;
   }
+
+  const historyTotal = historySummaries.reduce((sum, c) => sum + myEarnings(c), 0);
 
   // Merge all owner entries into a single "Step Album" row for display
   function mergeOwners(byUser: ByUserEntry[]): ByUserEntry[] {
@@ -267,11 +272,18 @@ export default async function FinancialPage() {
       {historySummaries.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Histórico</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-base">Histórico</CardTitle>
+              </div>
+              <span className="text-sm font-semibold tabular-nums">
+                {formatBRL(historyTotal)}
+              </span>
             </div>
-            <CardDescription>Pagamentos anteriores</CardDescription>
+            <CardDescription>
+              Pagamentos anteriores · total em {historySummaries.length} ciclo{historySummaries.length !== 1 ? "s" : ""}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {historySummaries.map((c) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, useRef, useCallback } from "react";
+import { useState, useTransition, useMemo, useRef, useCallback, useEffect } from "react";
 import { Users, Search, X, ChevronDown, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,37 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ReassignSelect } from "@/components/fila/reassign-select";
 import { bulkUpdateStatusAction, bulkReassignAction } from "@/server/actions/albums";
+import {
+  ALBUM_STATUS_LABELS,
+  ALBUM_STATUS_STYLES,
+  ALBUM_TYPE_LABELS,
+  KAZ_DOWNLOAD_URL,
+} from "@/lib/constants";
 import { toast } from "sonner";
 import type { AlbumStatus, AlbumType } from "@/types/database";
-
-const STATUS_LABEL: Record<AlbumStatus, string> = {
-  baixado: "Baixado",
-  editando: "Editando",
-  montado: "Montado",
-  enviado: "Enviado",
-  concluido: "Concluído",
-  descartado: "Descartado",
-  fotos_insuficientes: "Fotos insuf.",
-  duplicado: "Cópia",
-};
-
-const STATUS_CLASS: Record<AlbumStatus, string> = {
-  baixado: "bg-muted text-muted-foreground",
-  descartado: "bg-[hsl(var(--brand-amber)/0.12)] text-[hsl(var(--brand-amber))]",
-  editando: "bg-[hsl(var(--brand-blue)/0.12)] text-[hsl(var(--brand-blue))]",
-  montado: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  enviado: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  concluido: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  fotos_insuficientes: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  duplicado: "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400",
-};
-
-const TYPE_LABEL: Record<AlbumType, string> = {
-  colab: "Colab",
-  faculdade: "Faculdade",
-  especial: "Especial",
-  medicina: "Medicina",
-};
 
 const ACTIVE_STATUSES: AlbumStatus[] = ["baixado", "editando", "montado", "enviado", "concluido", "descartado"];
 const INUTILIZAVEL_STATUSES: AlbumStatus[] = ["fotos_insuficientes", "duplicado"];
@@ -72,23 +49,84 @@ interface Props {
   users: FilaUser[];
 }
 
+type AlbumOverride = Partial<Pick<FilaAlbum, "status" | "responsible_id">>;
+
 export function FilaQueue({ albums, users }: Props) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const lastClickedIndexRef = useRef<number | null>(null);
 
+  // Instant feedback on bulk status/reassign, hand-rolled since useOptimistic
+  // needs React 19 (this app is on 18). Overrides are applied on top of
+  // `albums` and pruned once the revalidated prop actually matches them, or
+  // immediately if the action fails.
+  const [overrides, setOverrides] = useState<Map<string, AlbumOverride>>(new Map());
+
+  useEffect(() => {
+    setOverrides((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Map(prev);
+      for (const a of albums) {
+        const o = next.get(a.id);
+        const matches = o && (o.status === undefined || o.status === a.status)
+          && (o.responsible_id === undefined || o.responsible_id === a.responsible_id);
+        if (matches) {
+          next.delete(a.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [albums]);
+
+  const optimisticAlbums = useMemo(() => {
+    if (overrides.size === 0) return albums;
+    return albums.map((a) => {
+      const o = overrides.get(a.id);
+      return o ? { ...a, ...o } : a;
+    });
+  }, [albums, overrides]);
+
+  function applyOptimistic(ids: string[], override: AlbumOverride) {
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      for (const id of ids) next.set(id, override);
+      return next;
+    });
+  }
+
+  function revertOptimistic(ids: string[]) {
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return albums;
-    return albums.filter(
+    if (!q) return optimisticAlbums;
+    return optimisticAlbums.filter(
       (a) =>
         a.student_name.toLowerCase().includes(q) ||
         a.faculty.toLowerCase().includes(q) ||
         (a.class_code ?? "").includes(q) ||
         (a.student_code ?? "").includes(q),
     );
-  }, [albums, search]);
+  }, [optimisticAlbums, search]);
+
+  // Selection shouldn't survive items scrolling out of the current filter —
+  // otherwise a bulk action can silently act on albums you're not looking at.
+  useEffect(() => {
+    const filteredIds = new Set(filtered.map((a) => a.id));
+    setSelected((prev) => {
+      if ([...prev].every((id) => filteredIds.has(id))) return prev;
+      const next = new Set([...prev].filter((id) => filteredIds.has(id)));
+      return next;
+    });
+  }, [filtered]);
 
   const albumsByUser = useMemo(() => {
     const map = new Map<string, FilaAlbum[]>();
@@ -155,19 +193,17 @@ export function FilaQueue({ albums, users }: Props) {
 
   function handleBulkStatus(status: AlbumStatus) {
     const ids = Array.from(selected);
+    applyOptimistic(ids, { status });
     startTransition(async () => {
       const res = await bulkUpdateStatusAction(ids, status);
       if (res.ok) {
-        toast.success(`${ids.length} álbum${ids.length !== 1 ? "ns" : ""} marcado${ids.length !== 1 ? "s" : ""} como ${STATUS_LABEL[status]}`);
+        toast.success(`${ids.length} álbum${ids.length !== 1 ? "ns" : ""} marcado${ids.length !== 1 ? "s" : ""} como ${ALBUM_STATUS_LABELS[status]}`);
         setSelected(new Set());
       } else {
         toast.error(res.error);
+        revertOptimistic(ids);
       }
     });
-  }
-
-  function resolveKazId(a: FilaAlbum): string | null {
-    return a.kaz_id ?? null;
   }
 
   function handleDownload() {
@@ -179,7 +215,7 @@ export function FilaQueue({ albums, users }: Props) {
     let missing = 0;
 
     for (const a of selectedAlbums) {
-      const kazId = resolveKazId(a);
+      const kazId = a.kaz_id;
       if (!kazId) { missing++; continue; }
       if (!seen.has(kazId)) { seen.add(kazId); toDownload.push(kazId); }
     }
@@ -193,7 +229,7 @@ export function FilaQueue({ albums, users }: Props) {
     toDownload.forEach((kazId) => {
       const numericId = kazId.replace(/^row_/, "");
       const link = document.createElement("a");
-      link.href = `https://api-php.kazformaturas.com.br/apis/download_formando/${numericId}`;
+      link.href = KAZ_DOWNLOAD_URL(numericId);
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       document.body.appendChild(link);
@@ -210,6 +246,7 @@ export function FilaQueue({ albums, users }: Props) {
   function handleBulkReassign(userId: string) {
     const ids = Array.from(selected);
     const userName = users.find((u) => u.id === userId)?.name ?? "—";
+    applyOptimistic(ids, { responsible_id: userId });
     startTransition(async () => {
       const res = await bulkReassignAction(ids, userId);
       if (res.ok) {
@@ -217,6 +254,7 @@ export function FilaQueue({ albums, users }: Props) {
         setSelected(new Set());
       } else {
         toast.error(res.error);
+        revertOptimistic(ids);
       }
     });
   }
@@ -285,16 +323,11 @@ export function FilaQueue({ albums, users }: Props) {
                             idx < userAlbums.length - 1 ? "border-b border-border/30" : ""
                           } ${isChecked ? "bg-accent/50" : "hover:bg-accent/30"}`}
                         >
-                          <div
+                          <Checkbox
+                            checked={isChecked}
+                            aria-label={`Selecionar ${album.student_name}`}
                             onClick={(e) => toggleOne(album.id, flatIndex, e.shiftKey)}
-                            className="cursor-pointer"
-                          >
-                            <Checkbox
-                              checked={isChecked}
-                              aria-label={`Selecionar ${album.student_name}`}
-                              tabIndex={-1}
-                            />
-                          </div>
+                          />
                           {code ? (
                             <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">{code}</span>
                           ) : (
@@ -305,11 +338,11 @@ export function FilaQueue({ albums, users }: Props) {
                             <p className="text-xs text-muted-foreground truncate">{album.faculty}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_CLASS[album.status]}`}>
-                              {STATUS_LABEL[album.status]}
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${ALBUM_STATUS_STYLES[album.status]}`}>
+                              {ALBUM_STATUS_LABELS[album.status]}
                             </span>
                             <span className="text-xs text-muted-foreground w-16 text-right">
-                              {TYPE_LABEL[album.type]}
+                              {ALBUM_TYPE_LABELS[album.type]}
                             </span>
                             <ReassignSelect
                               albumId={album.id}
@@ -334,19 +367,19 @@ export function FilaQueue({ albums, users }: Props) {
                           className={`rounded-lg border border-border/50 bg-card/30 px-3 py-2.5 space-y-1.5 select-none ${isChecked ? "border-primary/40 bg-accent/30" : ""}`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div
+                            <Checkbox
+                              checked={isChecked}
+                              aria-label={`Selecionar ${album.student_name}`}
                               onClick={(e) => toggleOne(album.id, flatIndex, e.shiftKey)}
-                              className="cursor-pointer mt-0.5 shrink-0"
-                            >
-                              <Checkbox checked={isChecked} tabIndex={-1} />
-                            </div>
+                              className="mt-0.5 shrink-0"
+                            />
                             <div className="min-w-0 flex-1">
                               {code && <p className="text-xs font-mono text-muted-foreground">{code}</p>}
                               <p className="text-sm font-medium truncate">{album.student_name}</p>
                               <p className="text-xs text-muted-foreground truncate">{album.faculty}</p>
                             </div>
-                            <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${STATUS_CLASS[album.status]}`}>
-                              {STATUS_LABEL[album.status]}
+                            <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${ALBUM_STATUS_STYLES[album.status]}`}>
+                              {ALBUM_STATUS_LABELS[album.status]}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -385,7 +418,7 @@ export function FilaQueue({ albums, users }: Props) {
             <DropdownMenuContent align="center">
               {BULK_STATUSES.map((s) => (
                 <DropdownMenuItem key={s} onSelect={() => handleBulkStatus(s)}>
-                  {STATUS_LABEL[s]}
+                  {ALBUM_STATUS_LABELS[s]}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

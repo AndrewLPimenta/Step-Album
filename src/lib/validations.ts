@@ -40,6 +40,14 @@ export const albumStatusSchema = z.object({
 });
 export type AlbumStatusInput = z.infer<typeof albumStatusSchema>;
 
+export const bulkAlbumIdsSchema = z
+  .array(z.string().uuid())
+  .min(1, "Nenhum álbum selecionado.");
+
+export const albumStatusValueSchema = z.enum(
+  ALL_ALBUM_STATUSES as [string, ...string[]],
+);
+
 export const problemCreateSchema = z.object({
   album_id: z.string().uuid(),
   problem: z.enum(ALL_PROBLEM_TYPES as [string, ...string[]]),

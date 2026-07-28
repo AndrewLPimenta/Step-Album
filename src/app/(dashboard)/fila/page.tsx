@@ -1,6 +1,5 @@
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { cleanupExpiredInutilizaveisAction } from "@/server/actions/albums";
 import {
   Card,
   CardContent,
@@ -8,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FolderOpen, ImageOff, Copy } from "lucide-react";
+import { ALBUM_STATUS_LABELS, ALBUM_STATUS_STYLES } from "@/lib/constants";
 import type { AlbumStatus, AlbumType, UserRow } from "@/types/database";
 import { FilaQueue } from "@/components/fila/fila-queue";
 import { computePaymentCycleForInstant, toDateOnly } from "@/lib/financial";
@@ -22,22 +22,6 @@ interface UserStats {
   enviado: number;
   total: number;
 }
-
-const STATUS_PILL: Record<ActiveStatus, string> = {
-  baixado: "bg-muted text-muted-foreground",
-  descartado: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  editando: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  montado: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  enviado: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-};
-
-const STATUS_LABEL_SHORT: Record<ActiveStatus, string> = {
-  baixado: "baixado",
-  descartado: "descartado",
-  editando: "editando",
-  montado: "montado",
-  enviado: "enviado",
-};
 
 type QueueAlbum = {
   id: string;
@@ -54,9 +38,6 @@ type QueueAlbum = {
 
 export default async function FilaPage() {
   await requireUser();
-
-  // Limpa inutilizáveis expirados ao carregar a página
-  await cleanupExpiredInutilizaveisAction();
 
   const supabase = await createClient();
 
@@ -133,8 +114,8 @@ export default async function FilaPage() {
                   <div className="flex flex-wrap gap-1">
                     {(["baixado", "descartado", "editando", "montado", "enviado"] as ActiveStatus[]).map((st) =>
                       s[st] > 0 ? (
-                        <span key={st} className={`text-xs px-1.5 py-0.5 rounded ${STATUS_PILL[st]}`}>
-                          {s[st]} {STATUS_LABEL_SHORT[st]}{s[st] !== 1 && st !== "editando" ? "s" : ""}
+                        <span key={st} className={`text-xs px-1.5 py-0.5 rounded ${ALBUM_STATUS_STYLES[st]}`}>
+                          {s[st]} {ALBUM_STATUS_LABELS[st].toLowerCase()}{s[st] !== 1 && st !== "editando" ? "s" : ""}
                         </span>
                       ) : null,
                     )}

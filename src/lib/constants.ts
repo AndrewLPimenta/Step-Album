@@ -57,6 +57,25 @@ export const ALBUM_STATUS_LABELS: Record<AlbumStatus, string> = {
   duplicado: "Cópia / Duplicado",
 };
 
+// Inline pill colors (bg + text, no border) — used by fila-queue and the
+// fila page's per-user status chips. StatusBadge has its own bordered look
+// and is intentionally not merged into this.
+export const ALBUM_STATUS_STYLES: Record<AlbumStatus, string> = {
+  baixado: "bg-muted text-muted-foreground",
+  descartado: "bg-[hsl(var(--brand-amber)/0.12)] text-[hsl(var(--brand-amber))]",
+  editando: "bg-[hsl(var(--brand-blue)/0.12)] text-[hsl(var(--brand-blue))]",
+  montado: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  enviado: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  concluido: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  fotos_insuficientes: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  duplicado: "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400",
+};
+
+// Kaz's public download endpoint — takes the numeric id (kaz_id with any
+// "row_" prefix stripped).
+export const KAZ_DOWNLOAD_URL = (numericId: string) =>
+  `https://api-php.kazformaturas.com.br/apis/download_formando/${numericId}`;
+
 export const ALBUM_STATUS_ORDER: AlbumStatus[] = [
   "baixado",
   "descartado",

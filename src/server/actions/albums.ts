@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
+import { z } from "zod";
 import {
   albumCreateSchema,
   albumStatusSchema,
+  albumStatusValueSchema,
   albumUpdateSchema,
+  bulkAlbumIdsSchema,
   problemCreateSchema,
   type AlbumCreateInput,
   type AlbumStatusInput,
@@ -38,6 +41,18 @@ async function logAudit(
   } catch (err) {
     console.error("[audit_log] failed:", err);
   }
+}
+
+async function isActiveUser(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<boolean> {
+  const { data } = (await supabase
+    .from("users")
+    .select("id, active")
+    .eq("id", userId)
+    .maybeSingle()) as { data: { id: string; active: boolean } | null };
+  return Boolean(data?.active);
 }
 
 export async function createAlbumAction(
@@ -107,6 +122,10 @@ export async function updateAlbumAction(
   const { id, ...rest } = parsed.data;
 
   const supabase = await createClient();
+
+  if (rest.responsible_id && !(await isActiveUser(supabase, rest.responsible_id))) {
+    return { ok: false, error: "Usuário responsável inválido ou inativo." };
+  }
 
   const update: Record<string, unknown> = { ...rest };
   if (rest.student_name) update.student_name = rest.student_name.trim();
@@ -445,7 +464,14 @@ export async function bulkUpdateStatusAction(
   status: import("@/types/database").AlbumStatus,
 ): Promise<ActionResult> {
   const session = await requireUser();
-  if (!ids.length) return { ok: false, error: "Nenhum álbum selecionado." };
+  const parsedIds = bulkAlbumIdsSchema.safeParse(ids);
+  if (!parsedIds.success) {
+    return { ok: false, error: parsedIds.error.errors[0].message };
+  }
+  const parsedStatus = albumStatusValueSchema.safeParse(status);
+  if (!parsedStatus.success) {
+    return { ok: false, error: "Status inválido." };
+  }
 
   const supabase = await createClient();
   const updatePayload: Record<string, unknown> = { status };
@@ -497,9 +523,21 @@ export async function bulkReassignAction(
   responsibleId: string,
 ): Promise<ActionResult> {
   const session = await requireUser();
-  if (!ids.length) return { ok: false, error: "Nenhum álbum selecionado." };
+  const parsedIds = bulkAlbumIdsSchema.safeParse(ids);
+  if (!parsedIds.success) {
+    return { ok: false, error: parsedIds.error.errors[0].message };
+  }
+  const parsedUserId = z.string().uuid().safeParse(responsibleId);
+  if (!parsedUserId.success) {
+    return { ok: false, error: "Responsável inválido." };
+  }
 
   const supabase = await createClient();
+
+  if (!(await isActiveUser(supabase, parsedUserId.data))) {
+    return { ok: false, error: "Usuário responsável inválido ou inativo." };
+  }
+
   const { error } = await supabase
     .from("albums")
     .update({ responsible_id: responsibleId })
@@ -515,8 +553,8 @@ export async function bulkReassignAction(
 }
 
 /**
- * Deleta álbuns inutilizáveis (fotos_insuficientes / duplicado) cujo ciclo já encerrou.
- * Chamado automaticamente no carregamento da fila.
+ * Exclusão manual em lote, admin-only. Não confundir com a limpeza automática
+ * de inutilizáveis expirados, que roda via cron (src/app/api/cron/cleanup-inutilizaveis).
  */
 export async function bulkDeleteAction(ids: string[]): Promise<ActionResult> {
   const session = await requireUser();
@@ -538,20 +576,3 @@ export async function bulkDeleteAction(ids: string[]): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function cleanupExpiredInutilizaveisAction(): Promise<ActionResult<{ deleted: number }>> {
-  await requireUser();
-  const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc("cleanup_cycle_excluded_albums");
-  if (error) {
-    console.error("[cleanup] error:", error);
-    return { ok: false, error: "Falha na limpeza automática." };
-  }
-  const deleted = (data as number) ?? 0;
-  if (deleted > 0) {
-    revalidatePath("/fila");
-    revalidatePath("/albums");
-    revalidatePath("/dashboard");
-  }
-  return { ok: true, data: { deleted } };
-}
