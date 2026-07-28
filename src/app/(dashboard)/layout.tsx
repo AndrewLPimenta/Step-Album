@@ -1,6 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 export default async function DashboardLayout({
   children,
@@ -10,14 +9,8 @@ export default async function DashboardLayout({
   const { profile } = await requireUser();
 
   return (
-    <div className="min-h-dvh flex">
-      <Sidebar role={profile.role} />
-      <div className="flex-1 md:pl-64 flex flex-col min-w-0">
-        <Header name={profile.name} email={profile.email} role={profile.role} />
-        <main className="flex-1 flex flex-col items-center p-4 md:p-6 animate-fade-in">
-          <div className="w-full max-w-7xl mx-auto">{children}</div>
-        </main>
-      </div>
-    </div>
+    <DashboardShell name={profile.name} email={profile.email} role={profile.role}>
+      {children}
+    </DashboardShell>
   );
 }

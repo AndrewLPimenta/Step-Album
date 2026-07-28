@@ -1,20 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import Link from "next/link";
+import { useTransition } from "react";
 import { usePathname } from "next/navigation";
-import Image from "next/image";
-import {
-  LayoutDashboard,
-  Wallet,
-  Users as UsersIcon,
-  FileImage,
-  ListTodo,
-  Target,
-  Paperclip,
-  LogOut,
-  Menu,
-} from "lucide-react";
+import { LogOut, PanelLeft, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -25,15 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ThemeToggle } from "./theme-toggle";
 import { signOutAction } from "@/server/actions/auth";
-import { cn, initials } from "@/lib/utils";
+import { initials } from "@/lib/utils";
 import { USER_ROLE_LABELS } from "@/lib/constants";
 import type { UserRole } from "@/types/database";
 
@@ -41,6 +23,8 @@ interface HeaderProps {
   name: string;
   email: string;
   role: UserRole;
+  collapsed: boolean;
+  onToggleSidebar: () => void;
 }
 
 const PAGE_LABELS: Record<string, string> = {
@@ -53,21 +37,9 @@ const PAGE_LABELS: Record<string, string> = {
   "/users": "Usuários",
 };
 
-export function Header({ name, email, role }: HeaderProps) {
+export function Header({ name, email, role, collapsed, onToggleSidebar }: HeaderProps) {
   const [isPending, startTransition] = useTransition();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-
-  const baseNav = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/albums", label: "Álbuns", icon: FileImage },
-    { href: "/fila", label: "Fila", icon: ListTodo },
-    { href: "/financial", label: "Financeiro", icon: Wallet },
-    { href: "/metas", label: "Metas", icon: Target },
-    { href: "/arquivos", label: "Arquivos", icon: Paperclip },
-  ];
-  const adminNav = [{ href: "/users", label: "Usuários", icon: UsersIcon }];
-  const nav = role === "admin" ? [...baseNav, ...adminNav] : baseNav;
 
   const pageLabel = Object.entries(PAGE_LABELS).find(([path]) =>
     pathname.startsWith(path),
@@ -81,65 +53,22 @@ export function Header({ name, email, role }: HeaderProps) {
         height: "calc(3.5rem + env(safe-area-inset-top))",
       }}
     >
-      {/* Mobile menu trigger */}
-      <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" className="md:hidden h-9 w-9">
-            <Menu className="h-5 w-5" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="left-0 top-0 translate-x-0 translate-y-0 h-dvh w-72 rounded-none sm:rounded-none p-0 flex flex-col overflow-hidden">
-          <DialogTitle className="sr-only">Menu</DialogTitle>
-          <div
-            className="flex h-14 items-center gap-2.5 px-5 border-b border-border/40 shrink-0"
-            style={{
-              paddingTop: "env(safe-area-inset-top)",
-              height: "calc(3.5rem + env(safe-area-inset-top))",
-            }}
-          >
-            <Image
-              src="/logo-stepalbum.svg"
-              alt="StepAlbum"
-              width={36}
-              height={36}
-              className="rounded-xl shrink-0"
-            />
-            <span className="text-[15px] font-semibold tracking-tight">StepAlbum</span>
-          </div>
-          <nav className="flex-1 flex flex-col justify-center px-4 py-6 space-y-1">
-            {nav.map((item) => {
-              const Icon = item.icon;
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200",
-                    active
-                      ? "bg-[hsl(var(--brand-blue)/0.1)] text-[hsl(var(--brand-blue))] font-medium"
-                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                  )}
-                >
-                  <Icon
-                    className={cn(
-                      "h-[18px] w-[18px] shrink-0",
-                      active ? "text-[hsl(var(--brand-amber))]" : "text-muted-foreground/50",
-                    )}
-                  />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </DialogContent>
-      </Dialog>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="hidden md:flex h-9 w-9 -ml-1"
+        onClick={onToggleSidebar}
+        aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+      >
+        {collapsed ? (
+          <PanelLeft className="h-[18px] w-[18px] text-muted-foreground" />
+        ) : (
+          <PanelLeftClose className="h-[18px] w-[18px] text-muted-foreground" />
+        )}
+      </Button>
 
-      {/* Page title — desktop */}
       {pageLabel && (
-        <span className="hidden md:block text-sm font-medium text-foreground/70 tracking-tight">
+        <span className="text-sm font-medium text-foreground/70 tracking-tight">
           {pageLabel}
         </span>
       )}

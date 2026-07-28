@@ -1,9 +1,36 @@
+import {
+  LayoutDashboard,
+  Wallet,
+  Users as UsersIcon,
+  FileImage,
+  ListTodo,
+  Target,
+  Paperclip,
+  type LucideIcon,
+} from "lucide-react";
 import type {
   AlbumStatus,
   AlbumType,
   ProblemType,
   UserRole,
 } from "@/types/database";
+
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/albums", label: "Álbuns", icon: FileImage },
+  { href: "/fila", label: "Fila", icon: ListTodo },
+  { href: "/financial", label: "Financeiro", icon: Wallet },
+  { href: "/metas", label: "Metas", icon: Target },
+  { href: "/arquivos", label: "Arquivos", icon: Paperclip },
+  { href: "/users", label: "Usuários", icon: UsersIcon, adminOnly: true },
+];
 
 export const ALBUM_VALUES: Record<AlbumType, number> = {
   colab: 15,
