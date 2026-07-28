@@ -102,12 +102,20 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   albuns: "Quantidade de álbuns",
 };
 
-export type ArquivoCategoria = "contrato" | "tutorial" | "modelo" | "outro";
+export type ArquivoCategoria =
+  | "contrato"
+  | "tutorial"
+  | "modelo"
+  | "outro"
+  | "software"
+  | "automações";
 
 export const ALL_ARQUIVO_CATEGORIAS: ArquivoCategoria[] = [
   "contrato",
   "tutorial",
   "modelo",
+  "software",
+  "automações",
   "outro",
 ];
 
@@ -115,6 +123,8 @@ export const ARQUIVO_CATEGORIA_LABELS: Record<ArquivoCategoria, string> = {
   contrato: "Contratos",
   tutorial: "Tutoriais",
   modelo: "Modelos",
+  software: "Softwares",
+  "automações": "Automações",
   outro: "Outros",
 };
 

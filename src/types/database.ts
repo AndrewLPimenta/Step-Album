@@ -28,7 +28,13 @@ export interface UserGoalRow {
 }
 
 // Same situation as `user_goals` — `arquivos` isn't in the generated types.
-export type ArquivoCategoria = "contrato" | "tutorial" | "modelo" | "outro";
+export type ArquivoCategoria =
+  | "contrato"
+  | "tutorial"
+  | "modelo"
+  | "outro"
+  | "software"
+  | "automações";
 export type ArquivoKind = "arquivo" | "link";
 export interface ArquivoRow {
   id: string;
