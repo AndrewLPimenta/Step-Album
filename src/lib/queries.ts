@@ -224,6 +224,10 @@ export async function computeDashboardStats(
   const now = nowBR();
   const weekStart = startOfWeek(now);
   const monthStart = startOfMonth(now);
+  // "Álbuns por diagramador" tracks the currently open cycle, not all-time —
+  // cycle_start is set/refreshed at creation and whenever status flips to
+  // enviado, so it's the authoritative "which cycle is this album in" field.
+  const currentCycleStart = toDateOnly(computePaymentCycleForInstant(new Date()).cycleStart);
 
   const userName = new Map(users.map((u) => [u.id, u.name]));
 
@@ -244,11 +248,19 @@ export async function computeDashboardStats(
     else if (a.status !== "descartado") inProgress++;
 
     if (a.status !== "descartado") {
-      byUser.set(
-        a.responsible_id,
-        (byUser.get(a.responsible_id) ?? 0) + 1,
-      );
       byType.set(a.type, (byType.get(a.type) ?? 0) + 1);
+      // Finished work (enviado/concluido) is locked to whichever cycle it
+      // actually closed in. Anything still in progress hasn't missed its
+      // cycle yet — it rolls forward and counts as current-cycle work until
+      // it's actually sent, however many cycles ago it was created.
+      const isFinished = a.status === "enviado" || a.status === "concluido";
+      const inCurrentCycle = isFinished ? a.cycle_start === currentCycleStart : true;
+      if (inCurrentCycle) {
+        byUser.set(
+          a.responsible_id,
+          (byUser.get(a.responsible_id) ?? 0) + 1,
+        );
+      }
     }
     byStatus.set(a.status, (byStatus.get(a.status) ?? 0) + 1);
 

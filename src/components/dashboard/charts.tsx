@@ -88,8 +88,8 @@ export function ProductionByUserChart({
         </CardTitle>
         <CardDescription>
           {showValue
-            ? "Receita total no período"
-            : "Total de álbuns produzidos no período"}
+            ? "Receita total no ciclo atual"
+            : "Total de álbuns produzidos no ciclo atual"}
         </CardDescription>
       </CardHeader>
       <CardContent>
