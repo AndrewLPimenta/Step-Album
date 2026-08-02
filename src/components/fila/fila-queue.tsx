@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo, useRef, useCallback, useEffect } from "react";
-import { Users, Search, X, ChevronDown, Download } from "lucide-react";
+import { Users, Search, X, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -66,6 +66,7 @@ export function FilaQueue({ albums, users }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>(TYPE_FILTER_ALL);
   const [responsibleFilter, setResponsibleFilter] = useState<string>(RESPONSIBLE_FILTER_ALL);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const lastClickedIndexRef = useRef<number | null>(null);
 
@@ -182,6 +183,15 @@ export function FilaQueue({ albums, users }: Props) {
     } else {
       setSelected(new Set(allFilteredIds));
     }
+  }
+
+  function toggleUserCollapsed(userId: string) {
+    setCollapsedUsers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
   }
 
   const toggleOne = useCallback((id: string, index: number, shiftKey: boolean) => {
@@ -359,16 +369,27 @@ export function FilaQueue({ albums, users }: Props) {
           <div className="space-y-5">
             {activeUsers.map((u) => {
               const userAlbums = albumsByUser.get(u.id) ?? [];
+              const isCollapsed = collapsedUsers.has(u.id);
               return (
                 <div key={u.id} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                  <button
+                    type="button"
+                    onClick={() => toggleUserCollapsed(u.id)}
+                    className="flex w-full items-center gap-2 text-left rounded-md px-1 py-0.5 hover:bg-accent/40 transition-colors"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <ChevronRight
+                      className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                    />
+                    <Users className="h-4 w-4 text-muted-foreground shrink-0" />
                     <h2 className="text-sm font-semibold">{u.name}</h2>
                     <span className="text-xs text-muted-foreground">
                       ({userAlbums.length} álbum{userAlbums.length !== 1 ? "ns" : ""})
                     </span>
-                  </div>
+                  </button>
 
+                  {!isCollapsed && (
+                  <>
                   {/* Desktop */}
                   <div className="hidden md:block rounded-lg border border-border/50 overflow-hidden">
                     {userAlbums.map((album, idx) => {
@@ -403,6 +424,9 @@ export function FilaQueue({ albums, users }: Props) {
                             <span className="text-xs text-muted-foreground w-16 text-right">
                               {ALBUM_TYPE_LABELS[album.type]}
                             </span>
+                            <span className="text-xs text-muted-foreground w-20 truncate text-right" title={u.name}>
+                              {u.name}
+                            </span>
                             <ReassignSelect
                               albumId={album.id}
                               currentUserId={album.responsible_id}
@@ -436,6 +460,7 @@ export function FilaQueue({ albums, users }: Props) {
                               {code && <p className="text-xs font-mono text-muted-foreground">{code}</p>}
                               <p className="text-sm font-medium truncate">{album.student_name}</p>
                               <p className="text-xs text-muted-foreground truncate">{album.faculty}</p>
+                              <p className="text-xs text-muted-foreground truncate">Responsável: {u.name}</p>
                             </div>
                             <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${ALBUM_STATUS_STYLES[album.status]}`}>
                               {ALBUM_STATUS_LABELS[album.status]}
@@ -453,6 +478,8 @@ export function FilaQueue({ albums, users }: Props) {
                       );
                     })}
                   </div>
+                  </>
+                  )}
                 </div>
               );
             })}
