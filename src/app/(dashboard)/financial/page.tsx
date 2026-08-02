@@ -111,7 +111,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
         <p className="text-sm text-muted-foreground">

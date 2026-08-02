@@ -8,7 +8,7 @@ export default async function UsersPage() {
   const { data } = await supabase.from("users").select("*").order("name");
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5 max-w-6xl">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
         <p className="text-sm text-muted-foreground">

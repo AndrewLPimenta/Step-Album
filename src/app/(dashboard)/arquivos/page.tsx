@@ -8,7 +8,7 @@ export default async function ArquivosPage() {
   const arquivos = await listArquivos();
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Arquivos</h1>

@@ -87,7 +87,7 @@ export default async function FilaPage() {
   const selectUsers = users.map((u) => ({ id: u.id, name: u.name }));
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-7xl">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Fila de trabalho</h1>
         <p className="text-sm text-muted-foreground">
