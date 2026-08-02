@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   listSentAlbums,
   buildCycleSummaries,
+  buildMonthSummaries,
   computeDiagramadorEarnings,
 } from "@/lib/queries";
 import {
@@ -13,6 +15,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Lock, TrendingUp, Clock, CheckCircle2, ChevronRight, Users } from "lucide-react";
 import { formatBRL, formatDate, computePaymentCycle, computePaymentCycleForInstant, nowBR, toDateOnly } from "@/lib/financial";
 import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
@@ -24,7 +27,14 @@ function daysUntil(dateStr: string, today: Date): number {
   return Math.round((target.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default async function FinancialPage() {
+interface FinancialPageProps {
+  searchParams: Promise<{ view?: string }>;
+}
+
+export default async function FinancialPage({ searchParams }: FinancialPageProps) {
+  const { view } = await searchParams;
+  const byMonth = view === "mes";
+
   const { profile } = await requireUser();
   const isAdmin = profile.role === "admin";
 
@@ -38,6 +48,7 @@ export default async function FinancialPage() {
   // Admins see all; diagramadores see only their own
   const sentAlbums = await listSentAlbums(isAdmin ? undefined : profile.id);
   const summaries = buildCycleSummaries(sentAlbums, users, today);
+  const monthSummaries = buildMonthSummaries(sentAlbums, users, today);
 
   const currentCycle = computePaymentCycleForInstant(new Date());
   const currentPaymentDate = toDateOnly(currentCycle.paymentDate);
@@ -80,6 +91,7 @@ export default async function FinancialPage() {
   }
 
   const historyTotal = historySummaries.reduce((sum, c) => sum + myEarnings(c), 0);
+  const monthTotal = monthSummaries.reduce((sum, m) => sum + myEarnings(m), 0);
 
   // Merge all owner entries into a single "Step Album" row for display
   function mergeOwners(byUser: ByUserEntry[]): ByUserEntry[] {
@@ -269,7 +281,7 @@ export default async function FinancialPage() {
       )}
 
       {/* History */}
-      {historySummaries.length > 0 && (
+      {(historySummaries.length > 0 || monthSummaries.length > 0) && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-2">
@@ -278,42 +290,93 @@ export default async function FinancialPage() {
                 <CardTitle className="text-base">Histórico</CardTitle>
               </div>
               <span className="text-sm font-semibold tabular-nums">
-                {formatBRL(historyTotal)}
+                {formatBRL(byMonth ? monthTotal : historyTotal)}
               </span>
             </div>
-            <CardDescription>
-              Pagamentos anteriores · total em {historySummaries.length} ciclo{historySummaries.length !== 1 ? "s" : ""}
-            </CardDescription>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardDescription>
+                {byMonth
+                  ? `Total em ${monthSummaries.length} mês${monthSummaries.length !== 1 ? "es" : ""}`
+                  : `Pagamentos anteriores · total em ${historySummaries.length} ciclo${historySummaries.length !== 1 ? "s" : ""}`}
+              </CardDescription>
+              <div className="inline-flex items-center rounded-lg border border-border/50 p-0.5 text-xs">
+                <Link
+                  href="?view=ciclo"
+                  className={cn(
+                    "rounded-md px-2.5 py-1 font-medium transition-colors",
+                    !byMonth ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Por ciclo
+                </Link>
+                <Link
+                  href="?view=mes"
+                  className={cn(
+                    "rounded-md px-2.5 py-1 font-medium transition-colors",
+                    byMonth ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Por mês
+                </Link>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {historySummaries.map((c) => (
-              <div key={c.paymentDate} className="rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Ciclo {c.label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Pago em {formatDate(c.paymentDate)} · {c.count} álbuns
-                    </p>
+            {byMonth
+              ? monthSummaries.map((m) => (
+                  <div key={m.monthKey} className="rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium capitalize">{m.label}</p>
+                        <p className="text-xs text-muted-foreground">{m.count} álbuns</p>
+                      </div>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {formatBRL(myEarnings(m))}
+                      </p>
+                    </div>
+                    {isAdmin && m.byUser.length > 1 && (
+                      <div className="mt-2 pt-2 border-t border-border/30 flex flex-wrap gap-x-4 gap-y-1">
+                        {mergeOwners(m.byUser).map((u) => (
+                          <span key={u.name} className="text-xs text-muted-foreground">
+                            {u.name}:{" "}
+                            <span className="font-medium text-foreground">{formatBRL(u.earnings)}</span>
+                            {!u.isOwner && u.total > 0 && (
+                              <span className="opacity-50"> ({Math.round((u.earnings / u.total) * 100)}%)</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {formatBRL(myEarnings(c))}
-                  </p>
-                </div>
-                {isAdmin && c.byUser.length > 1 && (
-                  <div className="mt-2 pt-2 border-t border-border/30 flex flex-wrap gap-x-4 gap-y-1">
-                    {mergeOwners(c.byUser).map((u) => (
-                      <span key={u.name} className="text-xs text-muted-foreground">
-                        {u.name}:{" "}
-                        <span className="font-medium text-foreground">{formatBRL(u.earnings)}</span>
-                        {!u.isOwner && u.total > 0 && (
-                          <span className="opacity-50"> ({Math.round((u.earnings / u.total) * 100)}%)</span>
-                        )}
-                      </span>
-                    ))}
+                ))
+              : historySummaries.map((c) => (
+                  <div key={c.paymentDate} className="rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Ciclo {c.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Pago em {formatDate(c.paymentDate)} · {c.count} álbuns
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {formatBRL(myEarnings(c))}
+                      </p>
+                    </div>
+                    {isAdmin && c.byUser.length > 1 && (
+                      <div className="mt-2 pt-2 border-t border-border/30 flex flex-wrap gap-x-4 gap-y-1">
+                        {mergeOwners(c.byUser).map((u) => (
+                          <span key={u.name} className="text-xs text-muted-foreground">
+                            {u.name}:{" "}
+                            <span className="font-medium text-foreground">{formatBRL(u.earnings)}</span>
+                            {!u.isOwner && u.total > 0 && (
+                              <span className="opacity-50"> ({Math.round((u.earnings / u.total) * 100)}%)</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                ))}
           </CardContent>
         </Card>
       )}

@@ -71,7 +71,7 @@ export function nowBR(): Date {
   return toBrazilTime(new Date());
 }
 
-const MONTH_NAMES_PT = [
+export const MONTH_NAMES_PT = [
   "jan",
   "fev",
   "mar",

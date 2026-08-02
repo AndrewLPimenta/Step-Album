@@ -9,7 +9,7 @@ import type {
   UserRow,
 } from "@/types/database";
 import { ALBUM_VALUES, DIAGRAMADOR_PAYOUTS } from "@/lib/constants";
-import { computePaymentCycle, computePaymentCycleForInstant, nowBR, toBrazilTime, toDateOnly } from "@/lib/financial";
+import { computePaymentCycle, computePaymentCycleForInstant, MONTH_NAMES_PT, nowBR, toBrazilTime, toDateOnly } from "@/lib/financial";
 
 export interface AlbumWithRelations extends AlbumRow {
   responsible_name: string | null;
@@ -518,6 +518,90 @@ export function buildCycleSummaries(
       isPast: paymentDate <= todayStr,
     }))
     .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+}
+
+export interface MonthSummary {
+  monthKey: string; // "2026-07"
+  label: string; // "Julho 2026"
+  total: number;
+  count: number;
+  byUser: { userId: string; name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean }[];
+  isPast: boolean;
+  albums: PaymentAlbumItem[];
+}
+
+/**
+ * Same shape as buildCycleSummaries, grouped by the calendar month of
+ * payment_date instead of the exact quinzenal cycle — lets /financial offer
+ * a "por mês" view alongside the default "por ciclo" one.
+ */
+export function buildMonthSummaries(
+  albums: CycleAlbum[],
+  users: UserWithRate[],
+  today: Date,
+): MonthSummary[] {
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  const monthMap = new Map<
+    string,
+    { total: number; count: number; byUser: Map<string, { total: number; earnings: number; count: number }>; albums: PaymentAlbumItem[] }
+  >();
+
+  for (const a of albums) {
+    if (!a.payment_date) continue;
+    const key = a.payment_date.slice(0, 7); // "YYYY-MM"
+    if (!monthMap.has(key)) {
+      monthMap.set(key, { total: 0, count: 0, byUser: new Map(), albums: [] });
+    }
+    const entry = monthMap.get(key)!;
+    entry.total += Number(a.value);
+    entry.count += 1;
+    const uid = a.responsible_id;
+    const respUser = userMap.get(uid);
+    const u = entry.byUser.get(uid) ?? { total: 0, earnings: 0, count: 0 };
+    u.total += Number(a.value);
+    u.earnings += respUser ? albumEarning(respUser, a.type, Number(a.value)) : Number(a.value);
+    u.count += 1;
+    entry.byUser.set(uid, u);
+    entry.albums.push({
+      id: a.id,
+      student_name: a.student_name,
+      class_code: a.class_code,
+      type: a.type,
+      status: a.status,
+      value: Number(a.value),
+      responsibleName: userMap.get(uid)?.name ?? "Desconhecido",
+    });
+  }
+
+  const todayMonth = toDateOnly(today).slice(0, 7);
+
+  return Array.from(monthMap.entries())
+    .map(([monthKey, entry]) => {
+      const [year, month] = monthKey.split("-").map(Number);
+      return {
+        monthKey,
+        label: `${MONTH_NAMES_PT[month - 1]}/${year}`,
+        total: entry.total,
+        count: entry.count,
+        albums: entry.albums,
+        byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => {
+          const user = userMap.get(uid);
+          const isAdmin = user?.role === "admin";
+          const isOwner = isAdmin && !user?.commission_rate;
+          return {
+            userId: uid,
+            name: user?.name ?? "Desconhecido",
+            total: v.total,
+            earnings: v.earnings,
+            count: v.count,
+            isAdmin,
+            isOwner,
+          };
+        }).sort((a, b) => b.total - a.total),
+        isPast: monthKey <= todayMonth,
+      };
+    })
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 }
 
 /**
