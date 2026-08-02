@@ -96,7 +96,7 @@ export default async function FilaPage() {
       </div>
 
       {/* Per-user workload cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {users.map((u) => {
           const s = userStats.get(u.id) ?? { baixado: 0, descartado: 0, editando: 0, montado: 0, enviado: 0, total: 0 };
           return (
@@ -111,10 +111,10 @@ export default async function FilaPage() {
                 {s.total === 0 ? (
                   <span className="text-xs text-muted-foreground">Nenhum álbum</span>
                 ) : (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-col gap-1">
                     {(["baixado", "descartado", "editando", "montado", "enviado"] as ActiveStatus[]).map((st) =>
                       s[st] > 0 ? (
-                        <span key={st} className={`text-xs px-1.5 py-0.5 rounded ${ALBUM_STATUS_STYLES[st]}`}>
+                        <span key={st} className={`text-xs px-1.5 py-0.5 rounded w-fit ${ALBUM_STATUS_STYLES[st]}`}>
                           {s[st]} {ALBUM_STATUS_LABELS[st].toLowerCase()}{s[st] !== 1 && st !== "editando" ? "s" : ""}
                         </span>
                       ) : null,
