@@ -356,7 +356,7 @@ export function FilaQueue({ albums, users }: Props) {
           </div>
 
           {/* Album list grouped by user */}
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="space-y-5">
             {activeUsers.map((u) => {
               const userAlbums = albumsByUser.get(u.id) ?? [];
               return (
