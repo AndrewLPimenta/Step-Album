@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -17,6 +24,7 @@ import {
   ALBUM_STATUS_LABELS,
   ALBUM_STATUS_STYLES,
   ALBUM_TYPE_LABELS,
+  ALL_ALBUM_TYPES,
   KAZ_DOWNLOAD_URL,
 } from "@/lib/constants";
 import { toast } from "sonner";
@@ -25,6 +33,8 @@ import type { AlbumStatus, AlbumType } from "@/types/database";
 const ACTIVE_STATUSES: AlbumStatus[] = ["baixado", "editando", "montado", "enviado", "concluido", "descartado"];
 const INUTILIZAVEL_STATUSES: AlbumStatus[] = ["fotos_insuficientes", "duplicado"];
 const BULK_STATUSES: AlbumStatus[] = [...ACTIVE_STATUSES, ...INUTILIZAVEL_STATUSES];
+const TYPE_FILTER_ALL = "todos";
+const RESPONSIBLE_FILTER_ALL = "todos";
 
 export interface FilaAlbum {
   id: string;
@@ -53,6 +63,8 @@ type AlbumOverride = Partial<Pick<FilaAlbum, "status" | "responsible_id">>;
 
 export function FilaQueue({ albums, users }: Props) {
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>(TYPE_FILTER_ALL);
+  const [responsibleFilter, setResponsibleFilter] = useState<string>(RESPONSIBLE_FILTER_ALL);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const lastClickedIndexRef = useRef<number | null>(null);
@@ -107,15 +119,18 @@ export function FilaQueue({ albums, users }: Props) {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return optimisticAlbums;
-    return optimisticAlbums.filter(
-      (a) =>
+    return optimisticAlbums.filter((a) => {
+      if (typeFilter !== TYPE_FILTER_ALL && a.type !== typeFilter) return false;
+      if (responsibleFilter !== RESPONSIBLE_FILTER_ALL && a.responsible_id !== responsibleFilter) return false;
+      if (!q) return true;
+      return (
         a.student_name.toLowerCase().includes(q) ||
         a.faculty.toLowerCase().includes(q) ||
         (a.class_code ?? "").includes(q) ||
-        (a.student_code ?? "").includes(q),
-    );
-  }, [optimisticAlbums, search]);
+        (a.student_code ?? "").includes(q)
+      );
+    });
+  }, [optimisticAlbums, search, typeFilter, responsibleFilter]);
 
   // Selection shouldn't survive items scrolling out of the current filter —
   // otherwise a bulk action can silently act on albums you're not looking at.
@@ -261,22 +276,66 @@ export function FilaQueue({ albums, users }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          placeholder="Buscar por nome, turma ou código..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-9"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      {/* Search + filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative max-w-sm flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Buscar por nome, turma ou código..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TYPE_FILTER_ALL}>Todos os tipos</SelectItem>
+            {ALL_ALBUM_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {ALBUM_TYPE_LABELS[t]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+          <SelectTrigger className="w-[170px]">
+            <SelectValue placeholder="Responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={RESPONSIBLE_FILTER_ALL}>Todos os responsáveis</SelectItem>
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(typeFilter !== TYPE_FILTER_ALL || responsibleFilter !== RESPONSIBLE_FILTER_ALL) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setTypeFilter(TYPE_FILTER_ALL);
+              setResponsibleFilter(RESPONSIBLE_FILTER_ALL);
+            }}
           >
-            <X className="h-3.5 w-3.5" />
-          </button>
+            <X className="h-3.5 w-3.5 mr-1" />
+            Limpar filtros
+          </Button>
         )}
       </div>
 
