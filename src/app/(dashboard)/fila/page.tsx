@@ -44,13 +44,18 @@ export default async function FilaPage() {
   const currentCycle = computePaymentCycleForInstant(new Date());
   const currentCycleStart = toDateOnly(currentCycle.cycleStart);
 
+  // Strictly the currently open cycle — no lookback into older, still-unsent
+  // backlog. Relies on the cycle boundary itself (financial.ts) not flipping
+  // until the boundary day has fully elapsed, so this doesn't go empty
+  // partway through the day the way it used to.
   const [albumsRes, usersRes] = await Promise.all([
     supabase
       .from("albums")
       .select(
-        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id, cycle_start",
+        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id",
       )
       .neq("status", "concluido")
+      .eq("cycle_start", currentCycleStart)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
@@ -59,16 +64,7 @@ export default async function FilaPage() {
       .order("name"),
   ]);
 
-  // Work still in progress (baixado/editando/montado) never ages out of the
-  // queue just because a cycle boundary passed — it rolls forward until it's
-  // actually sent. Only "finished" statuses (enviado + the inutilizável ones,
-  // which are meant to disappear at cycle end) are scoped to the cycle they
-  // actually landed in.
-  const rawAlbums = (albumsRes.data ?? []) as (QueueAlbum & { cycle_start: string | null })[];
-  const allAlbums = rawAlbums.filter(
-    (a) => a.status === "baixado" || a.status === "editando" || a.status === "montado"
-      || a.cycle_start === currentCycleStart,
-  );
+  const allAlbums = (albumsRes.data ?? []) as QueueAlbum[];
   const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "active">[];
 
   const inutilizavelStatuses = new Set<AlbumStatus>(["fotos_insuficientes", "duplicado"]);
