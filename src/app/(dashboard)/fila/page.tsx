@@ -42,16 +42,15 @@ export default async function FilaPage() {
   const supabase = await createClient();
 
   const currentCycle = computePaymentCycleForInstant(new Date());
-  const cycleStartStr = toDateOnly(currentCycle.cycleStart) + "T00:00:00";
+  const currentCycleStart = toDateOnly(currentCycle.cycleStart);
 
   const [albumsRes, usersRes] = await Promise.all([
     supabase
       .from("albums")
       .select(
-        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id",
+        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id, cycle_start",
       )
       .neq("status", "concluido")
-      .gte("created_at", cycleStartStr)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
@@ -60,7 +59,16 @@ export default async function FilaPage() {
       .order("name"),
   ]);
 
-  const allAlbums = (albumsRes.data ?? []) as QueueAlbum[];
+  // Work still in progress (baixado/editando/montado) never ages out of the
+  // queue just because a cycle boundary passed — it rolls forward until it's
+  // actually sent. Only "finished" statuses (enviado + the inutilizável ones,
+  // which are meant to disappear at cycle end) are scoped to the cycle they
+  // actually landed in.
+  const rawAlbums = (albumsRes.data ?? []) as (QueueAlbum & { cycle_start: string | null })[];
+  const allAlbums = rawAlbums.filter(
+    (a) => a.status === "baixado" || a.status === "editando" || a.status === "montado"
+      || a.cycle_start === currentCycleStart,
+  );
   const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "active">[];
 
   const inutilizavelStatuses = new Set<AlbumStatus>(["fotos_insuficientes", "duplicado"]);

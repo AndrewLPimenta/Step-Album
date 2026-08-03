@@ -131,19 +131,26 @@ export function computePaymentCycle(input: Date | string): PaymentCycle {
   return { cycleStart, cycleEnd, lastDay, paymentDate, label };
 }
 
-/** Cycles turn over at this hour (Brasília time) on days 03 and 18, not at midnight. */
-const CYCLE_CUTOFF_HOUR = 18;
+/**
+ * Cycles turn over at midnight (00:00) Brasília time — but only *after* the
+ * boundary day (03/18) itself has fully run its course. The outgoing cycle
+ * runs through 23:59 of the boundary day (day 03 or 18 stays in the OLD
+ * cycle all day); the new one only starts at 00:00 the day *after* (day
+ * 04/19). Modeled as a 24h backward shift, so the base day-rule sees the
+ * boundary day as still being the previous day. Confirmed with Andrew on
+ * 2026-08-03 (previously this was an 18:00-same-day cutoff — reverted since
+ * it was pulling unfinished work out of /fila hours before day 03 was over).
+ */
+const CYCLE_CUTOFF_HOUR = 24;
 
 /**
  * Resolves which payment cycle a real moment (e.g. "now", or the instant an
- * album was marked as sent) belongs to. An album sent at 10:00 on the 18th
- * still belongs to the cycle that's about to close; one sent at 19:00
- * already belongs to the new one. We model this by shifting the Brazilian
- * wall-clock instant back by the cutoff hour before reading off its calendar
- * day, then reusing the (hour-agnostic) day-based rule above. Only use this
- * for real instants — for calendar-day markers (e.g. chaining cycleEnd into
- * the next cycle, or building a label from a payment date) use
- * computePaymentCycle directly, since those don't carry a meaningful hour.
+ * album was marked as sent) belongs to. Shifts the Brazilian wall-clock
+ * instant back by the cutoff hour before reading off its calendar day, then
+ * reuses the (hour-agnostic) day-based rule above. Only use this for real
+ * instants — for calendar-day markers (e.g. chaining cycleEnd into the next
+ * cycle, or building a label from a payment date) use computePaymentCycle
+ * directly, since those don't carry a meaningful hour.
  */
 export function computePaymentCycleForInstant(instant: Date): PaymentCycle {
   const brazilNow = toBrazilTime(instant);
