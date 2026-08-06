@@ -12,7 +12,7 @@ interface BottomNavProps {
 
 export function BottomNav({ role }: BottomNavProps) {
   const pathname = usePathname();
-  const nav = NAV_ITEMS.filter((item) => !item.adminOnly || role === "admin");
+  const nav = NAV_ITEMS.filter((item) => !item.criadorOnly || role === "criador");
 
   return (
     <nav

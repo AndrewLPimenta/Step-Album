@@ -219,7 +219,7 @@ export type Database = {
         | "erro_download"
         | "arquivos_corrompidos"
         | "outro"
-      user_role: "admin" | "diagramador"
+      user_role: "admin" | "diagramador" | "criador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -363,7 +363,7 @@ export const Constants = {
         "arquivos_corrompidos",
         "outro",
       ],
-      user_role: ["admin", "diagramador"],
+      user_role: ["admin", "diagramador", "criador"],
     },
   },
 } as const

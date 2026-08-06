@@ -1,9 +1,9 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireCriador } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { UsersList } from "@/components/users/users-list";
 
 export default async function UsersPage() {
-  await requireAdmin();
+  await requireCriador();
   const supabase = await createClient();
   const { data } = await supabase.from("users").select("*").order("name");
 

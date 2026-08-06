@@ -19,7 +19,7 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  adminOnly?: boolean;
+  criadorOnly?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/financial", label: "Financeiro", icon: Wallet },
   { href: "/metas", label: "Metas", icon: Target },
   { href: "/arquivos", label: "Arquivos", icon: Paperclip },
-  { href: "/users", label: "Usuários", icon: UsersIcon, adminOnly: true },
+  { href: "/users", label: "Usuários", icon: UsersIcon, criadorOnly: true },
 ];
 
 export const ALBUM_VALUES: Record<AlbumType, number> = {
@@ -103,6 +103,7 @@ export const PROBLEM_LABELS: Record<ProblemType, string> = {
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrador",
   diagramador: "Diagramador",
+  criador: "Criador",
 };
 
 export const ALL_ALBUM_TYPES: AlbumType[] = [

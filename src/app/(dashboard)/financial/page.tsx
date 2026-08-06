@@ -36,7 +36,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
   const byMonth = view === "mes";
 
   const { profile } = await requireUser();
-  const isAdmin = profile.role === "admin";
+  const isCriador = profile.role === "criador";
 
   const supabase = await createClient();
   const today = nowBR();
@@ -46,7 +46,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
   const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "role" | "commission_rate">[];
 
   // Admins see all; diagramadores see only their own
-  const sentAlbums = await listSentAlbums(isAdmin ? undefined : profile.id);
+  const sentAlbums = await listSentAlbums(isCriador ? undefined : profile.id);
   const summaries = buildCycleSummaries(sentAlbums, users, today);
   const monthSummaries = buildMonthSummaries(sentAlbums, users, today);
 
@@ -76,10 +76,10 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
 
   // Admin: per-diagramador earnings within the current (open) cycle only
   const currentCycleAlbums = sentAlbums.filter((a) => a.payment_date === currentPaymentDate);
-  const diagramadorEarnings = isAdmin ? computeDiagramadorEarnings(currentCycleAlbums, users) : null;
+  const diagramadorEarnings = isCriador ? computeDiagramadorEarnings(currentCycleAlbums, users) : null;
 
   const myUser = users.find((u) => u.id === profile.id);
-  const isOwner = isAdmin && !myUser?.commission_rate;
+  const isOwner = isCriador && !myUser?.commission_rate;
 
   type ByUserEntry = { userId: string; name: string; total: number; earnings: number; count: number; isAdmin: boolean; isOwner: boolean };
 
@@ -153,7 +153,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
                   {closedSummary.count} álbum{closedSummary.count !== 1 ? "ns" : ""} enviado{closedSummary.count !== 1 ? "s" : ""}
                   <PaymentAlbumsButton date={prevPaymentDate} total={closedSummary.total} count={closedSummary.count} albums={closedSummary.albums} />
                 </div>
-                {isAdmin && closedSummary.byUser.length > 0 && (
+                {isCriador && closedSummary.byUser.length > 0 && (
                   <div className="space-y-1 pt-1 border-t border-border/40">
                     {mergeOwners(closedSummary.byUser).map((u) => (
                       <div key={u.name} className="flex justify-between text-xs">
@@ -200,7 +200,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
               {" · "}cresce conforme envios
               {openSummary && <PaymentAlbumsButton date={currentPaymentDate} total={openSummary.total} count={openSummary.count} albums={openSummary.albums} />}
             </div>
-            {isAdmin && openSummary && openSummary.byUser.length > 0 && (
+            {isCriador && openSummary && openSummary.byUser.length > 0 && (
               <div className="space-y-1 pt-1 border-t border-border/40">
                 {mergeOwners(openSummary.byUser).map((u) => (
                   <div key={u.name} className="flex justify-between text-xs">
@@ -248,7 +248,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
       )}
 
       {/* Admin: per-diagramador earnings breakdown */}
-      {isAdmin && diagramadorEarnings && diagramadorEarnings.length > 0 && (
+      {isCriador && diagramadorEarnings && diagramadorEarnings.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
                         {formatBRL(myEarnings(m))}
                       </p>
                     </div>
-                    {isAdmin && m.byUser.length > 1 && (
+                    {isCriador && m.byUser.length > 1 && (
                       <div className="mt-2 pt-2 border-t border-border/30 flex flex-wrap gap-x-4 gap-y-1">
                         {mergeOwners(m.byUser).map((u) => (
                           <span key={u.name} className="text-xs text-muted-foreground">
@@ -362,7 +362,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
                         {formatBRL(myEarnings(c))}
                       </p>
                     </div>
-                    {isAdmin && c.byUser.length > 1 && (
+                    {isCriador && c.byUser.length > 1 && (
                       <div className="mt-2 pt-2 border-t border-border/30 flex flex-wrap gap-x-4 gap-y-1">
                         {mergeOwners(c.byUser).map((u) => (
                           <span key={u.name} className="text-xs text-muted-foreground">
@@ -385,7 +385,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-16 text-center">
           <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-3" />
           <p className="text-sm font-medium">
-            {isAdmin ? "Nenhum álbum enviado ainda" : "Nenhum álbum seu foi enviado ainda"}
+            {isCriador ? "Nenhum álbum enviado ainda" : "Nenhum álbum seu foi enviado ainda"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             O valor aparece aqui conforme os álbuns forem marcados como enviados.

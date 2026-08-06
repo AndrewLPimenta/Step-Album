@@ -15,7 +15,7 @@ interface SidebarProps {
 
 export function Sidebar({ role, collapsed }: SidebarProps) {
   const pathname = usePathname();
-  const nav = NAV_ITEMS.filter((item) => !item.adminOnly || role === "admin");
+  const nav = NAV_ITEMS.filter((item) => !item.criadorOnly || role === "criador");
 
   return (
     <aside

@@ -37,7 +37,8 @@ type QueueAlbum = {
 };
 
 export default async function FilaPage() {
-  await requireUser();
+  const { profile } = await requireUser();
+  const isCriador = profile.role === "criador";
 
   const supabase = await createClient();
 
@@ -91,6 +92,10 @@ export default async function FilaPage() {
 
   const selectUsers = users.map((u) => ({ id: u.id, name: u.name }));
 
+  // Não-criadores só veem os próprios álbuns (já garantido pelo RLS) — os
+  // cartões de carga de trabalho seguem a mesma regra, mostrando só o deles.
+  const visibleUsers = isCriador ? users : users.filter((u) => u.id === profile.id);
+
   return (
     <div className="space-y-6 max-w-7xl">
       <div>
@@ -102,7 +107,7 @@ export default async function FilaPage() {
 
       {/* Per-user workload cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {users.map((u) => {
+        {visibleUsers.map((u) => {
           const s = userStats.get(u.id) ?? { baixado: 0, descartado: 0, editando: 0, montado: 0, enviado: 0, total: 0 };
           return (
             <Card key={u.id} className={s.total === 0 ? "opacity-50" : ""}>

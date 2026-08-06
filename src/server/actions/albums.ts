@@ -67,6 +67,7 @@ export async function createAlbumAction(
   // Diagramador cannot assign album to other people
   if (
     session.profile.role !== "admin" &&
+    session.profile.role !== "criador" &&
     parsed.data.responsible_id !== session.profile.id
   ) {
     return { ok: false, error: "Você só pode criar álbuns para si mesmo." };
@@ -195,7 +196,7 @@ export async function updateAlbumStatusAction(
 
 export async function deleteAlbumAction(id: string): Promise<ActionResult> {
   const session = await requireUser();
-  if (session.profile.role !== "admin") {
+  if (session.profile.role !== "admin" && session.profile.role !== "criador") {
     return { ok: false, error: "Apenas admins podem excluir álbuns." };
   }
   const supabase = await createClient();
@@ -252,6 +253,7 @@ export async function createAlbumsBulkAction(
   // Diagramador só pode importar álbuns atribuídos a si mesmo
   if (
     session.profile.role !== "admin" &&
+    session.profile.role !== "criador" &&
     items.some((item) => item.responsible_id !== session.profile.id)
   ) {
     return { ok: false, error: "Você só pode importar álbuns para si mesmo." };
@@ -558,7 +560,7 @@ export async function bulkReassignAction(
  */
 export async function bulkDeleteAction(ids: string[]): Promise<ActionResult> {
   const session = await requireUser();
-  if (session.profile.role !== "admin") {
+  if (session.profile.role !== "admin" && session.profile.role !== "criador") {
     return { ok: false, error: "Apenas admins podem excluir álbuns." };
   }
   if (!ids.length) return { ok: false, error: "Nenhum álbum selecionado." };

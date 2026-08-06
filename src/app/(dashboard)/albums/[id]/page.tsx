@@ -29,7 +29,7 @@ export default async function AlbumDetailPage({
 
   const { album, problems, responsible } = result;
   const diagramadores = await listDiagramadores();
-  const isAdmin = profile.role === "admin";
+  const isAdmin = profile.role === "criador";
 
   return (
     <div className="space-y-5 max-w-5xl">

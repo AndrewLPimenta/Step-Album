@@ -59,14 +59,14 @@ export const userCreateSchema = z.object({
   name: z.string().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
-  role: z.enum(["admin", "diagramador"]),
+  role: z.enum(["admin", "diagramador", "criador"]),
 });
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 
 export const userUpdateSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(2).max(80).optional(),
-  role: z.enum(["admin", "diagramador"]).optional(),
+  role: z.enum(["admin", "diagramador", "criador"]).optional(),
   active: z.boolean().optional(),
 });
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;

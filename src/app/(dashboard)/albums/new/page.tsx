@@ -18,7 +18,7 @@ export default async function NewAlbumPage() {
         mode="create"
         diagramadores={diagramadores}
         currentUserId={profile.id}
-        isAdmin={profile.role === "admin"}
+        isAdmin={profile.role === "criador"}
       />
     </div>
   );

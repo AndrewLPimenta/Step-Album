@@ -50,7 +50,7 @@ export function UsersList({ users }: UsersListProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "diagramador">("diagramador");
+  const [role, setRole] = useState<"admin" | "diagramador" | "criador">("diagramador");
 
   function handleCreate() {
     startTransition(async () => {
@@ -138,7 +138,7 @@ export function UsersList({ users }: UsersListProps) {
                 <Select
                   value={role}
                   onValueChange={(v) =>
-                    setRole(v as "admin" | "diagramador")
+                    setRole(v as "admin" | "diagramador" | "criador")
                   }
                   disabled={isPending}
                 >
@@ -146,6 +146,7 @@ export function UsersList({ users }: UsersListProps) {
                   <SelectContent>
                     <SelectItem value="diagramador">Diagramador</SelectItem>
                     <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="criador">Criador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -188,7 +189,7 @@ export function UsersList({ users }: UsersListProps) {
                 <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
                   {u.name}
                   <Badge
-                    variant={u.role === "admin" ? "default" : "secondary"}
+                    variant={u.role === "criador" ? "default" : "secondary"}
                     className="text-[10px]"
                   >
                     {USER_ROLE_LABELS[u.role]}

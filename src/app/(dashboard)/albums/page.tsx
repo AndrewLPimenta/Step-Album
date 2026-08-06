@@ -26,7 +26,7 @@ interface PageProps {
 export default async function AlbumsPage({ searchParams }: PageProps) {
   const { profile } = await requireUser();
   const sp = await searchParams;
-  const isAdmin = profile.role === "admin";
+  const isAdmin = profile.role === "criador";
 
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
 

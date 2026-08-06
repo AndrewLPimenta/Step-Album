@@ -391,10 +391,10 @@ export async function listSentAlbums(responsibleId?: string): Promise<CycleAlbum
 
 export type UserWithRate = Pick<UserRow, "id" | "name" | "role" | "commission_rate">;
 
-// "Dono": admin sem comissão configurada — recebe o valor cheio do álbum.
-// Qualquer outro (diagramador, ou admin com commission_rate setado, ex. Laura) recebe o valor fixo por tipo.
+// "Dono": criador sem comissão configurada — recebe o valor cheio do álbum.
+// Qualquer outro (diagramador, admin, ou criador com commission_rate setado) recebe o valor fixo por tipo.
 export function isCommissioned(user: UserWithRate): boolean {
-  return user.role !== "admin" || (user.commission_rate !== null && user.commission_rate !== undefined);
+  return user.role !== "criador" || (user.commission_rate !== null && user.commission_rate !== undefined);
 }
 
 export function albumEarning(user: UserWithRate, type: AlbumType, value: number): number {
@@ -513,7 +513,7 @@ export function buildCycleSummaries(
       albums: entry.albums,
       byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => {
         const user = userMap.get(uid);
-        const isAdmin = user?.role === "admin";
+        const isAdmin = user?.role === "criador";
         const isOwner = isAdmin && !user?.commission_rate;
         return {
           userId: uid,
@@ -596,7 +596,7 @@ export function buildMonthSummaries(
         albums: entry.albums,
         byUser: Array.from(entry.byUser.entries()).map(([uid, v]) => {
           const user = userMap.get(uid);
-          const isAdmin = user?.role === "admin";
+          const isAdmin = user?.role === "criador";
           const isOwner = isAdmin && !user?.commission_rate;
           return {
             userId: uid,

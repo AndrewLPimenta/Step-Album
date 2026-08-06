@@ -62,7 +62,7 @@ export default async function DashboardPage() {
       : 0;
 
   const cycle = currentCycleInfo();
-  const isAdmin = profile.role === "admin";
+  const isCriador = profile.role === "criador";
 
   // Translate breakdown labels
   const byStatus = stats.byStatus.map((s) => ({
@@ -126,7 +126,7 @@ export default async function DashboardPage() {
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {isAdmin ? (
+        {isCriador ? (
           <ProductionByUserChart data={stats.byUser} />
         ) : (
           <Card>
@@ -157,7 +157,7 @@ export default async function DashboardPage() {
               Próximos pagamentos
             </CardTitle>
             <CardDescription>
-              {isAdmin
+              {isCriador
                 ? "Receita prevista por data"
                 : "Suas previsões de recebimento"}
             </CardDescription>

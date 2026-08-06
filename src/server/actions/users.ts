@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requireCriador, requireUser } from "@/lib/auth";
 import {
   userCreateSchema,
   userUpdateSchema,
@@ -14,7 +14,7 @@ import type { ActionResult } from "./auth";
 export async function createUserAction(
   input: UserCreateInput,
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin();
+  await requireCriador();
   const parsed = userCreateSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.errors[0].message };
@@ -65,8 +65,8 @@ export async function updateUserAction(
     return { ok: false, error: parsed.error.errors[0].message };
   }
 
-  // Non-admins can only edit themselves and only the name.
-  if (session.profile.role !== "admin") {
+  // Only criador can edit others / change role or active flag.
+  if (session.profile.role !== "criador") {
     if (parsed.data.id !== session.profile.id) {
       return { ok: false, error: "Sem permissão." };
     }
@@ -88,7 +88,7 @@ export async function updateUserAction(
 export async function deactivateUserAction(
   userId: string,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  await requireCriador();
   const supabase = await createClient();
   const { error } = await supabase
     .from("users")
@@ -102,7 +102,7 @@ export async function deactivateUserAction(
 export async function reactivateUserAction(
   userId: string,
 ): Promise<ActionResult> {
-  await requireAdmin();
+  await requireCriador();
   const supabase = await createClient();
   const { error } = await supabase
     .from("users")

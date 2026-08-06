@@ -37,9 +37,9 @@ export async function requireUser(): Promise<SessionUser> {
   return { authId: user.id, profile: typedProfile };
 }
 
-export async function requireAdmin(): Promise<SessionUser> {
+export async function requireCriador(): Promise<SessionUser> {
   const session = await requireUser();
-  if (session.profile.role !== "admin") {
+  if (session.profile.role !== "criador") {
     redirect("/dashboard?error=forbidden");
   }
   return session;
