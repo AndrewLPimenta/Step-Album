@@ -44,18 +44,13 @@ export default async function FilaPage() {
   const currentCycle = computePaymentCycleForInstant(new Date());
   const currentCycleStart = toDateOnly(currentCycle.cycleStart);
 
-  // Strictly the currently open cycle — no lookback into older, still-unsent
-  // backlog. Relies on the cycle boundary itself (financial.ts) not flipping
-  // until the boundary day has fully elapsed, so this doesn't go empty
-  // partway through the day the way it used to.
   const [albumsRes, usersRes] = await Promise.all([
     supabase
       .from("albums")
       .select(
-        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id",
+        "id, student_name, class_code, student_code, faculty, type, status, responsible_id, created_at, kaz_id, cycle_start",
       )
       .neq("status", "concluido")
-      .eq("cycle_start", currentCycleStart)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
@@ -64,7 +59,18 @@ export default async function FilaPage() {
       .order("name"),
   ]);
 
-  const allAlbums = (albumsRes.data ?? []) as QueueAlbum[];
+  // cycle_start only gets recalculated when status flips to "enviado" — an
+  // album still sitting in baixado/editando/montado keeps whatever cycle it
+  // was created in, sometimes cycles ago. That work is still genuinely
+  // active and needs to stay visible, so it always shows regardless of age.
+  // "Finished" statuses (enviado, descartado — concluido is already excluded
+  // above) are scoped to the cycle they actually landed in, so they don't
+  // linger in the queue forever.
+  const rollsForward = new Set<AlbumStatus>(["baixado", "editando", "montado"]);
+  const rawAlbums = (albumsRes.data ?? []) as (QueueAlbum & { cycle_start: string | null })[];
+  const allAlbums = rawAlbums.filter(
+    (a) => rollsForward.has(a.status) || a.cycle_start === currentCycleStart,
+  );
   const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "active">[];
 
   const inutilizavelStatuses = new Set<AlbumStatus>(["fotos_insuficientes", "duplicado"]);

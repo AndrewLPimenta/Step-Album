@@ -249,11 +249,13 @@ export async function computeDashboardStats(
 
     if (a.status !== "descartado") {
       byType.set(a.type, (byType.get(a.type) ?? 0) + 1);
-      // Strictly the currently open cycle, no lookback into older backlog —
-      // the cycle boundary itself (financial.ts) doesn't flip until the
-      // boundary day has fully elapsed, so this doesn't need a rollover
-      // exception to avoid emptying out partway through the day.
-      if (a.cycle_start === currentCycleStart) {
+      // cycle_start only gets recalculated when status flips to enviado, so
+      // still-unfinished work keeps whatever cycle it was created in —
+      // possibly cycles ago. It's still active work, so it always counts;
+      // only finished (enviado/concluido) work is locked to the cycle it
+      // actually landed in.
+      const isFinished = a.status === "enviado" || a.status === "concluido";
+      if (!isFinished || a.cycle_start === currentCycleStart) {
         byUser.set(
           a.responsible_id,
           (byUser.get(a.responsible_id) ?? 0) + 1,
