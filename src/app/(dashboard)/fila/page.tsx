@@ -59,18 +59,13 @@ export default async function FilaPage() {
       .order("name"),
   ]);
 
-  // cycle_start only gets recalculated when status flips to "enviado" — an
-  // album still sitting in baixado/editando/montado keeps whatever cycle it
-  // was created in, sometimes cycles ago. That work is still genuinely
-  // active and needs to stay visible, so it always shows regardless of age.
-  // "Finished" statuses (enviado, descartado — concluido is already excluded
-  // above) are scoped to the cycle they actually landed in, so they don't
-  // linger in the queue forever.
-  const rollsForward = new Set<AlbumStatus>(["baixado", "editando", "montado"]);
+  // Strictly the current cycle only — nothing older than 18/7 → 3/8 shows
+  // here. Unfinished work stuck in a past cycle (cycle_start never moves
+  // while status sits in baixado/editando/montado) gets carried into the
+  // current cycle one hop at a time by the daily cron job instead of being
+  // pulled in at query time — see /api/cron/cleanup-inutilizaveis.
   const rawAlbums = (albumsRes.data ?? []) as (QueueAlbum & { cycle_start: string | null })[];
-  const allAlbums = rawAlbums.filter(
-    (a) => rollsForward.has(a.status) || a.cycle_start === currentCycleStart,
-  );
+  const allAlbums = rawAlbums.filter((a) => a.cycle_start === currentCycleStart);
   const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "active">[];
 
   const inutilizavelStatuses = new Set<AlbumStatus>(["fotos_insuficientes", "duplicado"]);

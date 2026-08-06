@@ -249,13 +249,11 @@ export async function computeDashboardStats(
 
     if (a.status !== "descartado") {
       byType.set(a.type, (byType.get(a.type) ?? 0) + 1);
-      // cycle_start only gets recalculated when status flips to enviado, so
-      // still-unfinished work keeps whatever cycle it was created in —
-      // possibly cycles ago. It's still active work, so it always counts;
-      // only finished (enviado/concluido) work is locked to the cycle it
-      // actually landed in.
-      const isFinished = a.status === "enviado" || a.status === "concluido";
-      if (!isFinished || a.cycle_start === currentCycleStart) {
+      // Strictly the current cycle — anything older stays out of this count,
+      // even if still unfinished. The daily cron carries stuck work forward
+      // into the current cycle one hop at a time instead of this counting
+      // stale cycle_start values directly.
+      if (a.cycle_start === currentCycleStart) {
         byUser.set(
           a.responsible_id,
           (byUser.get(a.responsible_id) ?? 0) + 1,
