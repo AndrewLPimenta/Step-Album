@@ -13,6 +13,24 @@ Este arquivo existe para que qualquer instância do Claude Code que abra este re
 - **Vercel** para deploy (auto-deploy no push pra `main`) e Vercel Cron para jobs agendados.
 - Deploy: push em `main` → Vercel builda e publica automaticamente. Não existe branch de staging separada neste fluxo.
 
+## App desktop (Tauri)
+
+Existe um shell desktop (macOS + Windows) em `src-tauri/`, adicionado em 2026-08-11. **Não é um bundle offline** — a janela do Tauri só carrega `https://step-album.vercel.app/?desktop=1` (configurado em `src-tauri/tauri.conf.json`, `app.windows[0].url`). Isso é proposital: o app desktop recebe todo commit/deploy automaticamente, do mesmo jeito que o navegador, sem nenhum mecanismo de auto-update próprio — é só uma casca nativa em volta do site já publicado.
+
+- `tauri-shell/index.html` é um placeholder vazio exigido pelo bundler do Tauri (`build.frontendDist`) — nunca é exibido de fato, já que a janela navega direto pra URL de produção.
+- Detecção "estou rodando dentro do app desktop": a URL tem `?desktop=1`, um script inline em `src/app/layout.tsx` grava isso no `localStorage` (`sa_desktop`) e seta `data-desktop-app="true"` no `<html>`. Isso é o único lugar onde o código web "sabe" que está no app — tudo daí pra frente é CSS puro em `src/app/globals.css`, escopado nesse atributo, então a versão web (navegador normal) fica **exatamente igual** a antes.
+- O visual "mais nativo de macOS" é só arredondamento maior de cantos (`--radius` sobe de 0.7rem pra 1rem só em modo desktop, mais overrides explícitos pra `.rounded-xl`/`.rounded-2xl` que não são vinculados a `--radius` no `tailwind.config.ts`).
+- Janela usa título oculto com overlay (`titleBarStyle: "Overlay"`, `hiddenTitle: true`, traffic lights nativas do macOS) — pra isso funcionar (arrastar a janela), o bloco do logo em `src/components/layout/sidebar.tsx` tem o atributo `data-tauri-drag-region` (inofensivo/ignorado num navegador normal, só o Tauri interpreta).
+- **Nunca testei visualmente num Mac de verdade dentro dessa sessão** (ambiente sem GUI) — só validei que o build compila e empacota. Vale abrir o `.app` gerado e conferir se a área de arrastar não tampa nenhum botão antes de distribuir pra equipe.
+
+Comandos:
+```bash
+npm run desktop:dev      # abre a janela do Tauri em modo dev
+npm run desktop:build    # gera o instalador (.app/.dmg no Mac, .msi/.exe no Windows — mas cross-compilar Windows a partir do Mac não é confiável, ver CI abaixo)
+```
+
+CI (`.github/workflows/release-desktop.yml`): builda Mac e Windows de verdade (runners nativos de cada OS) via `tauri-apps/tauri-action`, e sobe os instaladores como GitHub Release (rascunho). **Só dispara com uma tag `app-v*` ou manualmente** (`workflow_dispatch`) — não roda em todo push, porque o conteúdo do app já atualiza sozinho via Vercel; só precisa rebuildar o instalador quando o *shell* em si muda (ícone, config da janela, etc.) e alguém precisa (re)distribuir o binário pra equipe.
+
 ## Como rodar / verificar localmente
 
 ```bash

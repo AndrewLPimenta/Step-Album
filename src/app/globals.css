@@ -119,6 +119,48 @@
     background-clip: text;
   }
 
+  /* Desktop app (Tauri) — more pronounced, native-macOS style rounding.
+     Scoped to [data-desktop-app], set by the inline script in layout.tsx —
+     the website itself is untouched. --radius already drives rounded-lg/
+     md/sm everywhere via tailwind.config.ts; rounded-xl/2xl aren't wired to
+     it (kept fixed for the web app), so they get explicit overrides here. */
+  [data-desktop-app="true"] {
+    --radius: 1.1rem;
+  }
+  [data-desktop-app="true"] .rounded-xl {
+    border-radius: 1.3rem;
+  }
+  [data-desktop-app="true"] .rounded-2xl {
+    border-radius: 1.6rem;
+  }
+  /* Cards/panels read more like native macOS "material" surfaces with a
+     softer, larger-blur shadow instead of the tighter web shadow-sm. */
+  [data-desktop-app="true"] .shadow-sm {
+    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.03), 0 8px 24px -12px hsl(var(--foreground) / 0.12);
+  }
+
+  /* The window itself is transparent with a native macOS "sidebar" vibrancy
+     material behind it (src-tauri/tauri.conf.json, windowEffects) — the
+     sidebar's own CSS background/blur would just paint over that native
+     blur, so it steps aside and lets the real OS material show through.
+     Main content stays fully opaque (unchanged) for readability. */
+  [data-desktop-app="true"] .app-sidebar {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Drops the logo/drag-region row below the traffic lights instead of
+     beside them (titleBarStyle: Overlay, trafficLightPosition x:16 y:20 in
+     src-tauri/tauri.conf.json — the dots span roughly y:13-30). Stacking
+     vertically works the same whether the sidebar is collapsed or not;
+     dodging sideways doesn't, since the collapsed sidebar is narrower than
+     the traffic lights themselves. Web app keeps its normal spot. */
+  [data-desktop-app="true"] .app-sidebar-logo {
+    height: 5.5rem;
+    align-items: flex-start;
+    padding-top: 3rem;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }

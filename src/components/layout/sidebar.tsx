@@ -20,7 +20,7 @@ export function Sidebar({ role, collapsed }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden md:flex md:flex-col md:fixed md:inset-y-0 border-r border-border/40 bg-background/98 backdrop-blur-xl overflow-hidden transition-[width] duration-300 animate-in slide-in-from-left-5 fade-in duration-500",
+        "app-sidebar hidden md:flex md:flex-col md:fixed md:inset-y-0 border-r border-border/40 bg-background/98 backdrop-blur-xl overflow-hidden transition-[width] duration-300 animate-in slide-in-from-left-5 fade-in duration-500",
         collapsed ? "md:w-[4.5rem]" : "md:w-64",
       )}
     >
@@ -28,10 +28,13 @@ export function Sidebar({ role, collapsed }: SidebarProps) {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[hsl(var(--brand-blue)/0.07)] to-transparent" />
       <div className="pointer-events-none absolute top-0 right-0 h-32 w-32 rounded-full bg-[hsl(var(--brand-amber)/0.07)] blur-3xl" />
 
-      {/* Logo */}
+      {/* Logo — also doubles as the window drag handle in the desktop app
+          (data-tauri-drag-region is a no-op in a normal browser tab; only
+          the Tauri shell honors it, for the traffic-light overlay title bar). */}
       <div
+        data-tauri-drag-region
         className={cn(
-          "relative flex h-16 shrink-0 items-center gap-3 px-5 transition-all duration-300",
+          "app-sidebar-logo relative flex h-16 shrink-0 items-center gap-3 px-5 transition-all duration-300",
           collapsed && "justify-center px-0",
         )}
       >

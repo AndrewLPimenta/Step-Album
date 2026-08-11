@@ -10,7 +10,9 @@
     "type-check": "tsc --noEmit",
     "seed:users": "tsx scripts/seed-users.ts",
     "seed:data": "tsx scripts/seed-data.ts",
-    "seed": "npm run seed:users && npm run seed:data"
+    "seed": "npm run seed:users && npm run seed:data",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -43,6 +45,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
