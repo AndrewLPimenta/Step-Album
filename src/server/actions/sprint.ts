@@ -131,10 +131,13 @@ export async function checkSprintAlbumAction(
   // RLS já restringe a escrita ao responsável (ou admin/criador); o filtro
   // por responsible_id aqui garante que a sprint pessoal nunca mexa no
   // álbum de outra pessoa, mesmo para quem é criador e enxerga todos.
-  const { error } = await supabase
+  // `as any` no CLIENT, não no payload: os generics do @supabase/ssr fazem
+  // o parâmetro de .update() virar `never`, e aí nem `as any` passa. É o
+  // mesmo motivo dos 12 erros de baseline em albums.ts e users.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from("albums")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update(patch as any)
+    .update(patch)
     .eq("id", albumId)
     .eq("responsible_id", session.profile.id);
 

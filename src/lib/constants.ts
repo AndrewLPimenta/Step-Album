@@ -8,6 +8,7 @@ import {
   Paperclip,
   CalendarRange,
   MonitorDown,
+  HardDriveDownload,
   type LucideIcon,
 } from "lucide-react";
 import type {
@@ -32,6 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/financial", label: "Financeiro", icon: Wallet },
   { href: "/metas", label: "Metas", icon: Target },
   { href: "/arquivos", label: "Arquivos", icon: Paperclip },
+  { href: "/transferencias", label: "Transferências", icon: HardDriveDownload },
   { href: "/app", label: "App", icon: MonitorDown },
   { href: "/users", label: "Usuários", icon: UsersIcon, criadorOnly: true },
 ];
