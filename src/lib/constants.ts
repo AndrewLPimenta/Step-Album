@@ -6,6 +6,8 @@ import {
   ListTodo,
   Target,
   Paperclip,
+  CalendarRange,
+  MonitorDown,
   type LucideIcon,
 } from "lucide-react";
 import type {
@@ -26,9 +28,11 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/albums", label: "Álbuns", icon: FileImage },
   { href: "/fila", label: "Fila", icon: ListTodo },
+  { href: "/sprint", label: "Sprint", icon: CalendarRange },
   { href: "/financial", label: "Financeiro", icon: Wallet },
   { href: "/metas", label: "Metas", icon: Target },
   { href: "/arquivos", label: "Arquivos", icon: Paperclip },
+  { href: "/app", label: "App", icon: MonitorDown },
   { href: "/users", label: "Usuários", icon: UsersIcon, criadorOnly: true },
 ];
 

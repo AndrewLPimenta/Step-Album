@@ -161,6 +161,21 @@
     padding-top: 3rem;
   }
 
+  /* Coisas que so' fazem sentido no navegador — oferecer o download do
+     proprio app de desktop. Dentro do Tauri elas somem. */
+  [data-desktop-app="true"] .hide-in-desktop {
+    display: none;
+  }
+  /* E o inverso: o aviso "voce ja esta no app", que so' aparece la dentro.
+     O padrao e' escondido porque o atributo so' existe no Tauri — na web
+     o bloco nunca chega a ser exibido. */
+  .only-in-desktop {
+    display: none;
+  }
+  [data-desktop-app="true"] .only-in-desktop {
+    display: block;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
