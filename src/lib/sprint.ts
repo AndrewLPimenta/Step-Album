@@ -14,7 +14,6 @@ export interface SprintSettingsRow {
   minutos_especial: number;
   minutos_medicina: number;
   horas_por_dia: number;
-  status_do_check: AlbumStatus;
   created_at: string;
   updated_at: string;
 }
@@ -33,7 +32,6 @@ export const SPRINT_SETTINGS_PADRAO = {
   minutos_especial: 20,
   minutos_medicina: 180,
   horas_por_dia: 8,
-  status_do_check: "enviado" as AlbumStatus,
 };
 
 /** Status que ainda contam como trabalho a fazer. */
@@ -49,6 +47,9 @@ export interface SprintAlbum {
   status: AlbumStatus;
 }
 
+/** Quantos álbuns de cada tipo — é o que a tela mostra. */
+export type ContagemPorTipo = Partial<Record<AlbumType, number>>;
+
 export interface SprintDia {
   /** 'YYYY-MM-DD' */
   data: string;
@@ -56,15 +57,26 @@ export interface SprintDia {
   diaDaSemana: number;
   folga: boolean;
   hoje: boolean;
+  /** usado só para montar a distribuição; a tela lê `porTipo` */
   albuns: SprintAlbum[];
+  porTipo: ContagemPorTipo;
+  total: number;
   minutos: number;
   capacidadeMinutos: number;
+}
+
+export function contar(albuns: SprintAlbum[]): ContagemPorTipo {
+  const c: ContagemPorTipo = {};
+  for (const a of albuns) c[a.type] = (c[a.type] ?? 0) + 1;
+  return c;
 }
 
 export interface SprintPlano {
   dias: SprintDia[];
   /** Não coube na quinzena — o sinal de que a sprint está estourada. */
   sobra: SprintAlbum[];
+  sobraPorTipo: ContagemPorTipo;
+  totalPorTipo: ContagemPorTipo;
   totalAlbuns: number;
   totalMinutos: number;
   capacidadeMinutos: number;
@@ -155,6 +167,8 @@ export function montarPlano(params: {
       folga,
       hoje: data === hojeStr,
       albuns: [],
+      porTipo: {},
+      total: 0,
       minutos: 0,
       capacidadeMinutos: folga ? 0 : capacidadeDia,
     };
@@ -189,14 +203,9 @@ export function montarPlano(params: {
     melhor.minutos += c;
   }
 
-  // dentro do dia, do mais pesado para o mais leve: o difícil primeiro,
-  // enquanto a cabeça está fresca
   for (const dia of dias) {
-    dia.albuns.sort((x, y) => {
-      const c = custo(y) - custo(x);
-      if (c !== 0) return c;
-      return x.student_name.localeCompare(y.student_name, "pt-BR");
-    });
+    dia.porTipo = contar(dia.albuns);
+    dia.total = dia.albuns.length;
   }
 
   const totalMinutos = albuns.reduce((acc, a) => acc + custo(a), 0);
@@ -204,6 +213,8 @@ export function montarPlano(params: {
   return {
     dias,
     sobra,
+    sobraPorTipo: contar(sobra),
+    totalPorTipo: contar(albuns),
     totalAlbuns: albuns.length,
     totalMinutos,
     capacidadeMinutos: uteis.length * capacidadeDia,

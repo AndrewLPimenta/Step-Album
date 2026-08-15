@@ -15,14 +15,18 @@ export default async function SprintPage() {
   const supabase = await createClient();
 
   const ciclo = computePaymentCycleForInstant(new Date());
+  const inicioDoCiclo = toDateOnly(ciclo.cycleStart);
 
   const [albunsRes, settingsRes, folgasRes] = await Promise.all([
-    supabase
+    // Mesmo recorte da /fila: só o ciclo atual. Sem isso entram álbuns
+    // parados de ciclos antigos e a sprint mostra mais do que a fila —
+    // ver CLAUDE.md, "O bug recorrente: /fila sumindo".
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from("albums")
-      .select(
-        "id, student_name, class_code, student_code, faculty, type, status",
-      )
+      .select("id, student_name, class_code, student_code, faculty, type, status")
       .eq("responsible_id", profile.id)
+      .eq("cycle_start", inicioDoCiclo)
       .in("status", STATUS_PENDENTES)
       .order("student_name"),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +42,7 @@ export default async function SprintPage() {
       .eq("user_id", profile.id),
   ]);
 
-  const albuns = (albunsRes.data ?? []) as SprintAlbum[];
+  const albuns = (albunsRes?.data ?? []) as SprintAlbum[];
 
   const settings: Pick<
     SprintSettingsRow,
@@ -47,7 +51,6 @@ export default async function SprintPage() {
     | "minutos_especial"
     | "minutos_medicina"
     | "horas_por_dia"
-    | "status_do_check"
   > = settingsRes?.data ?? SPRINT_SETTINGS_PADRAO;
 
   const folgas = new Set<string>(
@@ -55,9 +58,7 @@ export default async function SprintPage() {
     ((folgasRes?.data ?? []) as any[]).map((f) => String(f.dia)),
   );
 
-  // lastDay, não cycleEnd: cycleEnd é EXCLUSIVO (serve de semente do ciclo
-  // seguinte). Usar ele daria um dia a mais de sprint, já pertencente ao
-  // próximo ciclo.
+  // lastDay, não cycleEnd: cycleEnd é EXCLUSIVO (semente do ciclo seguinte).
   const plano = montarPlano({
     albuns,
     settings,
@@ -70,9 +71,8 @@ export default async function SprintPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Sprint</h1>
         <p className="text-sm text-muted-foreground">
-          Seus álbuns pendentes distribuídos pelos dias que faltam até{" "}
-          {toDateOnly(ciclo.lastDay).split("-").reverse().join("/")}, o fim do
-          ciclo atual ({ciclo.label}).
+          Seus álbuns do ciclo {ciclo.label}, repartidos pelos dias que faltam.
+          Conforme você marca como enviado na Fila, eles saem daqui.
         </p>
       </div>
 
