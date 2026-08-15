@@ -34,8 +34,14 @@ export const SPRINT_SETTINGS_PADRAO = {
   horas_por_dia: 8,
 };
 
-/** Status que ainda contam como trabalho a fazer. */
-export const STATUS_PENDENTES: AlbumStatus[] = ["baixado", "editando", "montado"];
+/**
+ * Status que ainda contam como TRABALHO a fazer.
+ *
+ * `montado` fica de fora de propósito: o álbum já está pronto, só falta
+ * enviar — e enviar não é diagramação. Deixá-lo aqui fazia a sprint cobrar
+ * horas de um trabalho que já acabou.
+ */
+export const STATUS_PENDENTES: AlbumStatus[] = ["baixado", "editando"];
 
 export interface SprintAlbum {
   id: string;
