@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useTransition, useMemo, useRef, useCallback, useEffect } from "react";
-import { Users, Search, X, ChevronDown, ChevronRight, Download } from "lucide-react";
+import {
+  Users,
+  Search,
+  SearchX,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Download,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +36,7 @@ import {
   KAZ_DOWNLOAD_URL,
 } from "@/lib/constants";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { AlbumStatus, AlbumType } from "@/types/database";
 
 const ACTIVE_STATUSES: AlbumStatus[] = ["baixado", "editando", "montado", "enviado", "concluido", "descartado"];
@@ -350,7 +359,12 @@ export function FilaQueue({ albums, users }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">Nenhum álbum encontrado.</p>
+        <EmptyState
+          icon={SearchX}
+          title="Nenhum álbum encontrado"
+          description="Nenhum álbum do ciclo atual bate com os filtros de tipo e responsável."
+          className="py-10"
+        />
       ) : (
         <>
           {/* Select all row */}

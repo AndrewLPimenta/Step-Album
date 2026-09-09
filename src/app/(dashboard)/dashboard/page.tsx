@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   computeDashboardStats,
   currentCycleInfo,
@@ -25,6 +26,7 @@ import {
   Layers,
   AlertTriangle,
   Wallet,
+  CalendarClock,
 } from "lucide-react";
 import {
   ALBUM_STATUS_LABELS,
@@ -164,9 +166,16 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {stats.nextPayments.length === 0 && (
-              <p className="text-xs text-muted-foreground py-4">
-                Nenhum pagamento previsto.
-              </p>
+              <EmptyState
+                icon={CalendarClock}
+                title="Nenhum pagamento previsto"
+                description={
+                  isCriador
+                    ? "Álbuns marcados como enviados aparecem aqui com a data de pagamento."
+                    : "Seus álbuns marcados como enviados aparecem aqui com a data de pagamento."
+                }
+                className="border-0 py-6"
+              />
             )}
             {stats.nextPayments.map((p, i) => (
               <div

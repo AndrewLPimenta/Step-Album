@@ -34,6 +34,7 @@ import { relativeTime } from "@/lib/utils";
 import { deleteAlbumAction, bulkDeleteAction } from "@/server/actions/albums";
 import { toast } from "sonner";
 import type { AlbumRow } from "@/types/database";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export interface AlbumTableRow extends AlbumRow {
   responsible_name: string | null;
@@ -118,13 +119,12 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-16 text-center">
-        <AlertCircle className="h-8 w-8 text-muted-foreground/50 mb-3" />
-        <p className="text-sm font-medium">Nenhum álbum encontrado</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Ajuste os filtros ou crie um novo álbum.
-        </p>
-      </div>
+      <EmptyState
+        icon={AlertCircle}
+        title="Nenhum álbum encontrado"
+        description="Ajuste os filtros ou crie um novo álbum."
+        className="py-16"
+      />
     );
   }
 
@@ -181,7 +181,12 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="touch-target h-7 w-7 shrink-0"
+                      aria-label={`Ações do álbum de ${album.student_name}`}
+                    >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -328,7 +333,12 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="touch-target h-7 w-7"
+                          aria-label={`Ações do álbum de ${album.student_name}`}
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

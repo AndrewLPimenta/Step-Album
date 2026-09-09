@@ -22,8 +22,9 @@ export function BookmarkletInstaller({ code }: { code: string }) {
         <Button
           size="icon"
           variant="ghost"
-          className="absolute top-2 right-2 h-7 w-7"
+          className="touch-target absolute top-2 right-2 h-7 w-7"
           onClick={handleCopy}
+          aria-label="Copiar código do bookmarklet"
         >
           {copied ? (
             <Check className="h-3.5 w-3.5 text-green-500" />

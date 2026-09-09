@@ -16,7 +16,7 @@ import {
 import { ThemeToggle } from "./theme-toggle";
 import { signOutAction } from "@/server/actions/auth";
 import { initials } from "@/lib/utils";
-import { USER_ROLE_LABELS } from "@/lib/constants";
+import { navLabelForPathname, USER_ROLE_LABELS } from "@/lib/constants";
 import type { UserRole } from "@/types/database";
 
 interface HeaderProps {
@@ -27,23 +27,14 @@ interface HeaderProps {
   onToggleSidebar: () => void;
 }
 
-const PAGE_LABELS: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/albums": "Álbuns",
-  "/fila": "Fila de Trabalho",
-  "/financial": "Financeiro",
-  "/metas": "Metas",
-  "/arquivos": "Arquivos",
-  "/users": "Usuários",
-};
-
 export function Header({ name, email, role, collapsed, onToggleSidebar }: HeaderProps) {
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
 
-  const pageLabel = Object.entries(PAGE_LABELS).find(([path]) =>
-    pathname.startsWith(path),
-  )?.[1];
+  // Deriva do NAV_ITEMS. O mapa antigo tinha 7 entradas para 10 destinos, e
+  // /sprint, /transferencias e /app ficavam sem titulo — justamente as telas
+  // em que, no mobile, nao ha sidebar mostrando onde voce esta.
+  const pageLabel = navLabelForPathname(pathname);
 
   return (
     <header

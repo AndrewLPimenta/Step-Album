@@ -101,6 +101,7 @@ export function TransferenciasPanel({
                   onClick={remover}
                   disabled={isPending}
                   title="Remover meu código"
+                  aria-label="Remover meu código"
                 >
                   <Trash2 />
                 </Button>

@@ -66,6 +66,24 @@ const config: Config = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        // Fonte unica de cor de status/tipo de album. Os mapas em
+        // src/lib/constants.ts referenciam so' estes tokens — nenhum
+        // componente escolhe cor de status ou de tipo por conta propria.
+        status: {
+          idle: "hsl(var(--status-idle) / <alpha-value>)",
+          active: "hsl(var(--status-active) / <alpha-value>)",
+          assembled: "hsl(var(--status-assembled) / <alpha-value>)",
+          sent: "hsl(var(--status-sent) / <alpha-value>)",
+          done: "hsl(var(--status-done) / <alpha-value>)",
+          excluded: "hsl(var(--status-excluded) / <alpha-value>)",
+          problem: "hsl(var(--status-problem) / <alpha-value>)",
+        },
+        type: {
+          colab: "hsl(var(--type-colab) / <alpha-value>)",
+          faculdade: "hsl(var(--type-faculdade) / <alpha-value>)",
+          especial: "hsl(var(--type-especial) / <alpha-value>)",
+          medicina: "hsl(var(--type-medicina) / <alpha-value>)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

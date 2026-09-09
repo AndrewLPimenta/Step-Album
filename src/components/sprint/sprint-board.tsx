@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CalendarOff, Loader2, Settings2, TriangleAlert } from "lucide-react";
-import { ALBUM_TYPE_LABELS } from "@/lib/constants";
+import { ALBUM_TYPE_LABELS, ALBUM_TYPE_STYLES } from "@/lib/constants";
 import {
   formatarDuracao,
   rotuloDoDia,
@@ -34,13 +34,6 @@ type Settings = Pick<
 
 const ORDEM_TIPOS: AlbumType[] = ["medicina", "especial", "faculdade", "colab"];
 
-const COR_TIPO: Record<AlbumType, string> = {
-  medicina: "bg-[hsl(var(--brand-blue)/0.12)] text-[hsl(var(--brand-blue))]",
-  especial: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-  faculdade: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  colab: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-};
-
 function Tipos({ porTipo }: { porTipo: ContagemPorTipo }) {
   const itens = ORDEM_TIPOS.filter((t) => (porTipo[t] ?? 0) > 0);
   if (itens.length === 0) return null;
@@ -49,7 +42,7 @@ function Tipos({ porTipo }: { porTipo: ContagemPorTipo }) {
       {itens.map((t) => (
         <span
           key={t}
-          className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${COR_TIPO[t]}`}
+          className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${ALBUM_TYPE_STYLES[t]}`}
         >
           {porTipo[t]} {ALBUM_TYPE_LABELS[t]}
         </span>

@@ -29,11 +29,34 @@
     --info-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    /* Brand ring: Amber #FFBF00 */
-    --ring: 45 100% 50%;
+    /* Focus ring: brand blue. O ambar da marca (#FFBF00) rende so' 1.65:1
+       contra fundo branco — abaixo dos 3:1 que a WCAG 2.4.11 pede pra
+       indicador de foco. O ambar segue como cor de marca e como anel no
+       tema escuro, onde tem contraste de sobra. */
+    --ring: 225 73% 57%;
     --radius: 0.7rem;
     --brand-blue: 225 73% 57%;
     --brand-amber: 45 100% 50%;
+
+    /* Status do album — fonte unica de cor, na ordem do fluxo de producao
+       (baixado -> editando -> montado -> enviado -> concluido). Estados
+       fora do fluxo (descartado/duplicado/fotos_insuficientes) usam cinza
+       e laranja, nunca cor de fluxo, pra nao parecerem uma etapa. */
+    --status-idle: 240 4% 46%;
+    --status-active: 225 73% 57%;
+    --status-assembled: 271 71% 55%;
+    --status-sent: 178 70% 34%;
+    --status-done: 142 71% 36%;
+    --status-excluded: 215 16% 47%;
+    --status-problem: 25 90% 44%;
+
+    /* Tipo do album — segunda fonte unica. Compartilha matizes com os
+       status de proposito: o que separa os dois e' a forma (tipo = badge
+       de contorno, status = pilula solida), nao o tom. */
+    --type-colab: 240 4% 46%;
+    --type-faculdade: 225 73% 57%;
+    --type-especial: 271 71% 55%;
+    --type-medicina: 38 92% 40%;
   }
 
   .dark {
@@ -43,8 +66,11 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 8% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 96%;
-    --primary-foreground: 240 6% 10%;
+    /* Era 0 0% 96% (branco, default do shadcn): o azul da marca sumia de
+       todo botao primario no tema escuro. Clareado o suficiente pra
+       segurar contraste sobre o fundo #0A0A0B. */
+    --primary: 225 73% 68%;
+    --primary-foreground: 240 10% 8%;
     --secondary: 240 5% 12%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 5% 12%;
@@ -64,6 +90,19 @@
     --ring: 45 100% 50%;
     --brand-blue: 225 73% 57%;
     --brand-amber: 45 100% 50%;
+
+    --status-idle: 240 5% 65%;
+    --status-active: 225 73% 70%;
+    --status-assembled: 271 76% 74%;
+    --status-sent: 178 60% 52%;
+    --status-done: 142 65% 56%;
+    --status-excluded: 215 20% 64%;
+    --status-problem: 25 90% 62%;
+
+    --type-colab: 240 5% 65%;
+    --type-faculdade: 225 73% 70%;
+    --type-especial: 271 76% 74%;
+    --type-medicina: 45 95% 60%;
   }
 }
 
@@ -174,6 +213,29 @@
   }
   [data-desktop-app="true"] .only-in-desktop {
     display: block;
+  }
+
+  /* Amplia a area de toque de botoes de icone pequenos (h-7/h-8 = 28-32px)
+     ate os 44px minimos, sem mexer no tamanho visual. Exige position
+     relative no proprio botao. */
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    height: 44px;
+    width: 44px;
+    transform: translate(-50%, -50%);
+  }
+  @media (pointer: fine) {
+    /* No desktop o cursor e' preciso; a area extra so' atrapalharia alvos
+       vizinhos em tabelas densas. */
+    .touch-target::after {
+      display: none;
+    }
   }
 
   /* Scrollbar */

@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { OfflineGuard } from "@/components/providers/offline-guard";
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
@@ -42,15 +41,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning className={inter.variable}>
       <body className={`min-h-dvh app-backdrop ${inter.className}`}>
-        {/* Marks the desktop (Tauri) build so globals.css can apply a more
-            native-macOS look (rounder corners, etc.) — the web version stays
-            untouched. Runs before paint, same pattern as the theme script,
-            to avoid a flash of unstyled corners on load. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=new URLSearchParams(window.location.search);if(p.get('desktop')==='1'){localStorage.setItem('sa_desktop','1');}if(localStorage.getItem('sa_desktop')==='1'){document.documentElement.setAttribute('data-desktop-app','true');}}catch(e){}})();`,
-          }}
-        />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
@@ -58,7 +48,6 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
-          <OfflineGuard />
         </ThemeProvider>
       </body>
     </html>

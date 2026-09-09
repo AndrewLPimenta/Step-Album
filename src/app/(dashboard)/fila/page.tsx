@@ -10,7 +10,12 @@ import { FolderOpen, ImageOff, Copy } from "lucide-react";
 import { ALBUM_STATUS_LABELS, ALBUM_STATUS_STYLES } from "@/lib/constants";
 import type { AlbumStatus, AlbumType, UserRow } from "@/types/database";
 import { FilaQueue } from "@/components/fila/fila-queue";
-import { computePaymentCycleForInstant, toDateOnly } from "@/lib/financial";
+import {
+  computePaymentCycleForInstant,
+  formatDate,
+  toDateOnly,
+} from "@/lib/financial";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ActiveStatus = Extract<AlbumStatus, "baixado" | "descartado" | "editando" | "montado" | "enviado">;
 
@@ -141,13 +146,16 @@ export default async function FilaPage() {
       {activeAlbums.length > 0 ? (
         <FilaQueue albums={activeAlbums} users={selectUsers} />
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-16 text-center">
-          <FolderOpen className="h-8 w-8 text-muted-foreground/50 mb-3" />
-          <p className="text-sm font-medium">Fila vazia</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Nenhum álbum em andamento no momento.
-          </p>
-        </div>
+        <EmptyState
+          icon={FolderOpen}
+          title="Fila vazia"
+          // Nomear o ciclo importa: a fila filtra por cycle_start === ciclo
+          // atual, entao "vazia" pode significar tanto trabalho em dia quanto
+          // rollover de ciclo que nao rodou. Sem a data as duas situacoes
+          // ficam identicas na tela.
+          description={`Nenhum álbum em andamento no ciclo atual, iniciado em ${formatDate(currentCycle.cycleStart)}.`}
+          className="py-16"
+        />
       )}
 
       {/* Inutilizáveis — Fotos insuficientes */}

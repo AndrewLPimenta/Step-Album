@@ -187,10 +187,11 @@ export function ProblemsPanel({ albumId, problems }: ProblemsPanelProps) {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-7 w-7"
+                        className="touch-target h-7 w-7"
                         onClick={() => handleResolve(p.id)}
                         disabled={isPending}
                         title="Marcar como resolvido"
+                        aria-label="Marcar problema como resolvido"
                       >
                         <Check className="h-3.5 w-3.5" />
                       </Button>
@@ -198,10 +199,11 @@ export function ProblemsPanel({ albumId, problems }: ProblemsPanelProps) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      className="touch-target h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={() => handleDelete(p.id)}
                       disabled={isPending}
                       title="Remover"
+                      aria-label="Remover problema"
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>

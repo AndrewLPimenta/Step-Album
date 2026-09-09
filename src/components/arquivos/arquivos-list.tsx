@@ -19,6 +19,7 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -54,13 +55,12 @@ export function ArquivosList({ items }: { items: ArquivoWithMeta[] }) {
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-16 text-center">
-        <File className="h-8 w-8 text-muted-foreground/50 mb-3" />
-        <p className="text-sm font-medium">Nenhum arquivo ou link ainda</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Use o botão &quot;Adicionar&quot; para compartilhar o primeiro.
-        </p>
-      </div>
+      <EmptyState
+        icon={File}
+        title="Nenhum arquivo ou link ainda"
+        description={'Use o botão "Adicionar" para compartilhar o primeiro.'}
+        className="py-16"
+      />
     );
   }
 
@@ -114,8 +114,23 @@ export function ArquivosList({ items }: { items: ArquivoWithMeta[] }) {
 
                 <div className="flex items-center gap-1 shrink-0">
                   {item.download_url && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                      <a href={item.download_url} target="_blank" rel="noopener noreferrer" download={item.kind === "arquivo" ? item.file_name ?? undefined : undefined}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="touch-target h-8 w-8"
+                      asChild
+                    >
+                      <a
+                        href={item.download_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={item.kind === "arquivo" ? item.file_name ?? undefined : undefined}
+                        aria-label={
+                          item.kind === "link"
+                            ? `Abrir ${item.title}`
+                            : `Baixar ${item.title}`
+                        }
+                      >
                         {item.kind === "link" ? (
                           <ExternalLink className="h-4 w-4" />
                         ) : (
@@ -127,9 +142,10 @@ export function ArquivosList({ items }: { items: ArquivoWithMeta[] }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    className="touch-target h-8 w-8 text-destructive hover:text-destructive"
                     disabled={isPending && deletingId === item.id}
                     onClick={() => handleDelete(item.id)}
+                    aria-label={`Remover ${item.title}`}
                   >
                     {isPending && deletingId === item.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
