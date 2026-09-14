@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import Image from "next/image";
 import { updatePasswordAction } from "@/server/actions/auth";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "@/lib/icons";
 
 export default function ResetPasswordPage() {
   const [isPending, startTransition] = useTransition();

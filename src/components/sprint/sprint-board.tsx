@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CalendarOff, Loader2, Settings2, TriangleAlert } from "lucide-react";
+import { CalendarOff, Loader2, Settings2, TriangleAlert } from "@/lib/icons";
 import { ALBUM_TYPE_LABELS, ALBUM_TYPE_STYLES } from "@/lib/constants";
 import {
   formatarDuracao,

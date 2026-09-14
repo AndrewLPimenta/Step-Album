@@ -12,7 +12,7 @@ export default function Loading() {
           <Skeleton key={i} className="h-9 w-32 rounded-lg" />
         ))}
       </div>
-      <div className="rounded-xl border border-border/60">
+      <div className="glass">
         <Skeleton className="h-11 w-full rounded-t-xl rounded-b-none" />
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="border-t border-border/40 p-3">

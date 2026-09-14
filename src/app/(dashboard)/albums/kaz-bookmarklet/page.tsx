@@ -6,13 +6,13 @@ export default function KazBookmarkletPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Bookmarklet: Kaz → StepAlbum</h1>
+        <h1 className="font-display text-3xl tracking-tight">Bookmarklet: Kaz → StepAlbum</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Um clique na página do Kaz copia todos os álbuns direto para o clipboard.
         </p>
       </div>
 
-      <div className="rounded-xl border bg-card p-6 space-y-4">
+      <div className="glass p-6 space-y-4">
         <h2 className="font-semibold">Como instalar</h2>
         <ol className="space-y-3 text-sm text-muted-foreground list-decimal list-inside">
           <li>Copie o código abaixo usando o botão.</li>
@@ -29,12 +29,12 @@ export default function KazBookmarkletPage() {
         </ol>
       </div>
 
-      <div className="rounded-xl border bg-card p-6 space-y-4">
+      <div className="glass p-6 space-y-4">
         <h2 className="font-semibold">Código do bookmarklet</h2>
         <BookmarkletInstaller code={BOOKMARKLET} />
       </div>
 
-      <div className="rounded-xl border bg-card p-6 space-y-3">
+      <div className="glass p-6 space-y-3">
         <h2 className="font-semibold">Como usar</h2>
         <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
           <li>Acesse <strong>sistema.kazformaturas.com.br/diagramacoes/dashboard</strong> e faça login.</li>

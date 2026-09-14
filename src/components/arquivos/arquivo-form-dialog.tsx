@@ -34,7 +34,7 @@ import {
   type ArquivoCategoria,
 } from "@/lib/constants";
 import { toast } from "sonner";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus } from "@/lib/icons";
 
 function sanitizeFileName(name: string) {
   return name.normalize("NFKD").replace(/[^\w.-]+/g, "_");

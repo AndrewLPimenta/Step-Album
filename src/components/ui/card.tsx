@@ -8,7 +8,11 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-border/60 bg-card/50 text-card-foreground shadow-sm backdrop-blur-sm animate-slide-up",
+      // Superficie de vidro (.glass em globals.css): raio, borda, sombra e
+      // backdrop-filter vem de la', entao nao ha bg-card/border aqui pra
+      // pintar por cima. Qualquer rounded-*/bg-* passado via className
+      // ainda vence, porque .glass mora em @layer components.
+      "glass text-card-foreground animate-slide-up",
       className,
     )}
     {...props}

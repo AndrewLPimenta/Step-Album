@@ -13,7 +13,7 @@ import { formatBRL, formatDate } from "@/lib/financial";
 import { ALBUM_STATUS_LABELS, ALBUM_TYPE_LABELS } from "@/lib/constants";
 import type { PaymentAlbumItem } from "@/lib/queries";
 import type { AlbumStatus } from "@/types/database";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/lib/icons";
 
 export type { PaymentAlbumItem };
 
@@ -56,7 +56,7 @@ export function PaymentAlbumsDialog({ date, total, count, albums, trigger }: Pro
           {albums.map((a) => (
             <div
               key={a.id}
-              className="flex items-center gap-3 rounded-xl border border-border/40 bg-card/40 px-3.5 py-2.5"
+              className="flex items-center gap-3 glass-chip rounded-2xl px-3.5 py-2.5"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{a.student_name}</p>

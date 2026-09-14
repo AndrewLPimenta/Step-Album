@@ -14,7 +14,7 @@ export default function Loading() {
       </div>
       <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="space-y-2 rounded-xl border border-border/60 p-4">
+          <div key={i} className="space-y-2 glass p-4">
             <div className="flex items-center gap-3">
               <Skeleton className="h-8 w-8 rounded-full" />
               <Skeleton className="h-4 w-40" />

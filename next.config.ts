@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
     },
+    // Barril de icones: sem isto cada import de "@phosphor-icons/react"
+    // arrasta o pacote inteiro no dev, e o primeiro compile de cada rota
+    // fica na casa dos segundos.
+    optimizePackageImports: ["@phosphor-icons/react"],
   },
   reactStrictMode: true,
   typescript: {

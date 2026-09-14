@@ -8,7 +8,7 @@ import {
   MonitorDown,
   RefreshCw,
   ShieldAlert,
-} from "lucide-react";
+} from "@/lib/icons";
 
 /**
  * O instalador do Windows mora em public/downloads e e' servido pelo
@@ -51,7 +51,7 @@ export default async function AppPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">App</h1>
+        <h1 className="font-display text-3xl tracking-tight">App</h1>
         <p className="text-sm text-muted-foreground">
           O StepAlbum como programa de computador, em janela própria.
         </p>

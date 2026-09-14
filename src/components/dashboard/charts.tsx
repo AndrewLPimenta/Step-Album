@@ -1,311 +1,246 @@
 "use client";
 
+import { useState } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
-  Cell,
-  PieChart,
-  Pie,
-  Legend,
+  XAxis,
+  YAxis,
 } from "recharts";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { formatBRL } from "@/lib/financial";
 
-const CHART_COLORS = [
-  "hsl(225,73%,57%)",
-  "hsl(45,100%,50%)",
-  "hsl(280,60%,62%)",
-  "hsl(142,60%,45%)",
-  "hsl(0,70%,60%)",
-  "hsl(190,70%,50%)",
-];
-
-const CHART_COLORS_ALPHA = [
-  "hsl(225,73%,57%,0.15)",
-  "hsl(45,100%,50%,0.15)",
-  "hsl(280,60%,62%,0.15)",
-  "hsl(142,60%,45%,0.15)",
-  "hsl(0,70%,60%,0.15)",
-  "hsl(190,70%,50%,0.15)",
-];
-
-interface BarDatum {
-  name: string;
+export interface RevenuePoint {
+  /** Rotulo curto do eixo X: "03", "07", "18 SET". */
+  label: string;
+  /** Faturamento acumulado ate' aquele ponto. */
   value: number;
 }
 
+export interface RevenueSeries {
+  key: string;
+  /** Nome da aba: Ciclo / Anterior / Mês. */
+  tab: string;
+  /** "03 — 18 set" */
+  period: string;
+  total: number;
+  /** Meta do periodo, ou null quando o usuario nao definiu uma. */
+  goal: number | null;
+  points: RevenuePoint[];
+}
+
+const BLUE = "hsl(225 73% 57%)";
+const AMBER = "hsl(45 100% 50%)";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomBarTooltip({ active, payload, label, showValue }: any) {
+function RevenueTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
-  const val = payload[0].value as number;
-  const color = payload[0].fill as string;
   return (
-    <div className="rounded-xl border border-border/50 bg-card/95 px-3.5 py-2.5 shadow-xl backdrop-blur-sm text-sm">
-      {label && <p className="mb-1 font-medium text-foreground/80">{label}</p>}
-      <p className="tabular-nums font-semibold" style={{ color }}>
-        {showValue ? formatBRL(val) : `${val} álbum${val !== 1 ? "ns" : ""}`}
+    <div className="glass rounded-xl px-3.5 py-2.5 text-sm">
+      <p className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="font-semibold tabular-nums text-foreground">
+        {formatBRL(payload[0].value as number)}
       </p>
     </div>
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomPieTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const { name, value, fill } = payload[0];
-  return (
-    <div className="rounded-xl border border-border/50 bg-card/95 px-3.5 py-2.5 shadow-xl backdrop-blur-sm text-sm">
-      <p className="font-medium text-foreground/80">{name}</p>
-      <p className="tabular-nums font-semibold" style={{ color: fill }}>
-        {value} álbum{(value as number) !== 1 ? "ns" : ""}
-      </p>
-    </div>
-  );
-}
-
-export function ProductionByUserChart({
-  data,
-  showValue = false,
+/**
+ * Faturamento acumulado do periodo. Acumulado — nao por dia — de proposito:
+ * a pergunta que o card responde e' "quanto ja' garanti neste ciclo e quanto
+ * falta pra meta", e a linha tracejada da meta so' faz sentido contra uma
+ * curva que sobe.
+ */
+export function RevenueAreaChart({
+  series,
+  emptyHint,
 }: {
-  data: BarDatum[];
-  showValue?: boolean;
+  series: RevenueSeries[];
+  emptyHint: string;
+}) {
+  const [activeKey, setActiveKey] = useState(series[0]?.key);
+  const active = series.find((s) => s.key === activeKey) ?? series[0];
+  if (!active) return null;
+
+  const last = active.points[active.points.length - 1];
+  const hasData = active.points.some((p) => p.value > 0);
+
+  // Teto do eixo: sempre acima da meta, senao a linha tracejada sai do
+  // grafico justamente quando ela e' a informacao mais util (falta muito).
+  const max = Math.max(active.total, active.goal ?? 0, 1);
+
+  return (
+    <div className="glass overflow-hidden p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">
+            Faturamento acumulado
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Somente os seus álbuns enviados ou concluídos.
+          </p>
+        </div>
+
+        <div
+          className="glass-chip inline-flex items-center rounded-full p-1"
+          role="tablist"
+          aria-label="Período do gráfico"
+        >
+          {series.map((s) => {
+            const on = s.key === active.key;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setActiveKey(s.key)}
+                className={
+                  "rounded-full px-3.5 py-1 text-sm font-medium transition-all " +
+                  (on
+                    ? "bg-[hsl(var(--brand-blue))] text-white shadow-[0_10px_20px_-12px_hsl(225_73%_45%/0.9)]"
+                    : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                {s.tab}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Periodo / acumulado / meta — os tres numeros que o grafico ilustra,
+          legiveis sem precisar interpretar a curva. */}
+      <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3">
+        <Figure label="Período" value={active.period} />
+        <Figure
+          label="Acumulado"
+          value={formatBRL(active.total)}
+          ink="var(--ink-blue)"
+        />
+        <Figure
+          label="Meta"
+          value={active.goal ? formatBRL(active.goal) : "—"}
+          ink="var(--ink-amber)"
+        />
+      </dl>
+
+      <div className="mt-4">
+        {hasData ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart
+              data={active.points}
+              margin={{ top: 10, right: 14, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={BLUE} stopOpacity={0.3} />
+                  <stop offset="55%" stopColor={AMBER} stopOpacity={0.16} />
+                  <stop offset="100%" stopColor={AMBER} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                vertical={false}
+                stroke="var(--brd)"
+                strokeDasharray="0"
+              />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={28}
+              />
+              <YAxis hide domain={[0, max * 1.12]} />
+              {active.goal ? (
+                <ReferenceLine
+                  y={active.goal}
+                  stroke={AMBER}
+                  strokeDasharray="7 6"
+                  strokeWidth={1.5}
+                />
+              ) : null}
+              <Tooltip
+                content={<RevenueTooltip />}
+                cursor={{ stroke: "var(--brd)", strokeWidth: 1 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={BLUE}
+                strokeWidth={2}
+                fill="url(#revFill)"
+                animationDuration={700}
+                animationEasing="ease-out"
+                dot={false}
+              />
+              {last ? (
+                <ReferenceDot
+                  x={last.label}
+                  y={last.value}
+                  r={4}
+                  fill="var(--glass)"
+                  stroke={AMBER}
+                  strokeWidth={2.5}
+                />
+              ) : null}
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-[300px] items-center justify-center px-6 text-center text-xs text-muted-foreground">
+            {emptyHint}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-5 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span
+            className="h-0.5 w-4 rounded-full"
+            style={{ background: BLUE }}
+            aria-hidden="true"
+          />
+          Acumulado
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="h-0 w-4 border-t-2 border-dashed"
+            style={{ borderColor: AMBER }}
+            aria-hidden="true"
+          />
+          Meta do período
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Figure({
+  label,
+  value,
+  ink,
+}: {
+  label: string;
+  value: string;
+  ink?: string;
 }) {
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle>
-          {showValue ? "Receita por diagramador" : "Álbuns por diagramador"}
-        </CardTitle>
-        <CardDescription>
-          {showValue
-            ? "Receita total no ciclo atual"
-            : "Total de álbuns produzidos no ciclo atual"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart
-              data={data}
-              margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
-              barCategoryGap="35%"
-            >
-              <defs>
-                {data.map((_, i) => (
-                  <linearGradient
-                    key={i}
-                    id={`barGrad${i}`}
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor={CHART_COLORS[i % CHART_COLORS.length]}
-                      stopOpacity={1}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor={CHART_COLORS[i % CHART_COLORS.length]}
-                      stopOpacity={0.6}
-                    />
-                  </linearGradient>
-                ))}
-              </defs>
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) =>
-                  showValue ? `R$${(v as number).toFixed(0)}` : String(v)
-                }
-              />
-              <Tooltip
-                cursor={{ fill: "hsl(var(--accent)/0.4)", radius: 6 }}
-                content={<CustomBarTooltip showValue={showValue} />}
-              />
-              <Bar
-                dataKey="value"
-                radius={[8, 8, 3, 3]}
-                animationDuration={800}
-                animationEasing="ease-out"
-              >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={`url(#barGrad${i})`} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-export function StatusBreakdownChart({ data }: { data: BarDatum[] }) {
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle>Distribuição por status</CardTitle>
-        <CardDescription>Situação atual da operação</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <defs>
-                {data.map((_, i) => (
-                  <radialGradient key={i} id={`pieGrad${i}`} cx="50%" cy="50%" r="50%">
-                    <stop
-                      offset="0%"
-                      stopColor={CHART_COLORS[i % CHART_COLORS.length]}
-                      stopOpacity={1}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor={CHART_COLORS[i % CHART_COLORS.length]}
-                      stopOpacity={0.75}
-                    />
-                  </radialGradient>
-                ))}
-              </defs>
-              <Pie
-                data={data}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={55}
-                outerRadius={90}
-                paddingAngle={3}
-                strokeWidth={0}
-                animationDuration={800}
-                animationEasing="ease-out"
-              >
-                {data.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={`url(#pieGrad${i})`}
-                    stroke={CHART_COLORS_ALPHA[i % CHART_COLORS_ALPHA.length]}
-                    strokeWidth={2}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomPieTooltip />} />
-              <Legend
-                verticalAlign="bottom"
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                iconSize={8}
-                iconType="circle"
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-export function TypeBreakdownChart({ data }: { data: BarDatum[] }) {
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle>Distribuição por tipo</CardTitle>
-        <CardDescription>Mix de álbuns produzidos</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart
-              data={data}
-              layout="vertical"
-              margin={{ top: 8, right: 16, left: 60, bottom: 0 }}
-              barCategoryGap="30%"
-            >
-              <defs>
-                {data.map((_, i) => (
-                  <linearGradient
-                    key={i}
-                    id={`hBarGrad${i}`}
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor={CHART_COLORS[i % CHART_COLORS.length]}
-                      stopOpacity={1}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor={CHART_COLORS[i % CHART_COLORS.length]}
-                      stopOpacity={0.55}
-                    />
-                  </linearGradient>
-                ))}
-              </defs>
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickLine={false}
-                axisLine={false}
-                width={80}
-              />
-              <Tooltip
-                cursor={{ fill: "hsl(var(--accent)/0.4)", radius: 6 }}
-                content={<CustomBarTooltip />}
-              />
-              <Bar
-                dataKey="value"
-                radius={[3, 8, 8, 3]}
-                animationDuration={800}
-                animationEasing="ease-out"
-              >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={`url(#hBarGrad${i})`} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function EmptyChart() {
-  return (
-    <div className="flex h-[240px] items-center justify-center text-xs text-muted-foreground/50">
-      Sem dados no período
+    <div>
+      <dt className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd
+        className="mt-1 font-display text-lg font-semibold tabular-nums tracking-tight"
+        style={ink ? { color: `hsl(${ink})` } : undefined}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

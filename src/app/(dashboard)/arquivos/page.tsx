@@ -11,7 +11,7 @@ export default async function ArquivosPage() {
     <div className="space-y-6 max-w-6xl">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Arquivos</h1>
+          <h1 className="font-display text-3xl tracking-tight">Arquivos</h1>
           <p className="text-sm text-muted-foreground">
             Links e arquivos compartilhados pela equipe.
           </p>

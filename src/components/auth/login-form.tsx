@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import Image from "next/image";
 import { signInAction } from "@/server/actions/auth";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "@/lib/icons";
 import { toast } from "sonner";
 
 export function LoginForm({ defaultError }: { defaultError?: string }) {

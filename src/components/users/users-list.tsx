@@ -37,7 +37,7 @@ import {
 import { initials } from "@/lib/utils";
 import { USER_ROLE_LABELS } from "@/lib/constants";
 import type { UserRow } from "@/types/database";
-import { UserPlus, Loader2, Ban, RotateCcw } from "lucide-react";
+import { UserPlus, Loader2, Ban, RotateCcw } from "@/lib/icons";
 import { toast } from "sonner";
 
 interface UsersListProps {
@@ -171,7 +171,7 @@ export function UsersList({ users }: UsersListProps) {
         {users.map((u) => (
           <div
             key={u.id}
-            className="flex items-center justify-between rounded-lg border border-border/50 bg-card/30 px-3 py-2.5"
+            className="flex items-center justify-between glass-chip rounded-xl px-3 py-2.5"
           >
             <div className="flex items-center gap-3 min-w-0">
               <Avatar className="h-9 w-9">

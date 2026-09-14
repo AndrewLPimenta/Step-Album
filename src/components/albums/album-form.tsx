@@ -39,7 +39,7 @@ import type {
 } from "@/types/database";
 import { formatBRL } from "@/lib/financial";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/lib/icons";
 
 interface AlbumFormProps {
   mode: "create" | "edit";

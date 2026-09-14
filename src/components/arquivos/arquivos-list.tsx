@@ -18,7 +18,7 @@ import {
   Link2,
   Loader2,
   Trash2,
-} from "lucide-react";
+} from "@/lib/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 
 function formatFileSize(bytes: number | null): string {
@@ -84,7 +84,7 @@ export function ArquivosList({ items }: { items: ArquivoWithMeta[] }) {
       ) : (
         <div className="space-y-2">
           {filtered.map((item) => (
-            <Card key={item.id} className="border-border/50 bg-card/30">
+            <Card key={item.id} className="border-[var(--brd)]">
               <CardContent className="flex items-center gap-3 py-3.5">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                   {item.kind === "link" ? (

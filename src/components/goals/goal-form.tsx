@@ -23,7 +23,7 @@ import { upsertGoalAction, deleteGoalAction } from "@/server/actions/goals";
 import { ALL_GOAL_TYPES, GOAL_TYPE_LABELS, type GoalType } from "@/lib/constants";
 import type { UserGoalRow } from "@/types/database";
 import { toast } from "sonner";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "@/lib/icons";
 
 interface GoalFormProps {
   goal: UserGoalRow | null;

@@ -9,7 +9,7 @@ export default async function NewAlbumPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Novo álbum</h1>
+        <h1 className="font-display text-3xl tracking-tight">Novo álbum</h1>
         <p className="text-sm text-muted-foreground">
           Preencha as informações abaixo. O valor é definido pelo tipo.
         </p>

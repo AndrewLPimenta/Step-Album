@@ -10,7 +10,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Target } from "lucide-react";
+import { Target } from "@/lib/icons";
 
 export default async function MetasPage() {
   const { profile } = await requireUser();
@@ -24,7 +24,7 @@ export default async function MetasPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Minha meta</h1>
+        <h1 className="font-display text-3xl tracking-tight">Minha meta</h1>
         <p className="text-sm text-muted-foreground">
           Defina uma meta pessoal e acompanhe seu progresso.
         </p>

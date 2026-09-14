@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Lock, TrendingUp, Clock, CheckCircle2, ChevronRight, Users } from "lucide-react";
+import { Lock, TrendingUp, Clock, CheckCircle2, ChevronRight, Users } from "@/lib/icons";
 import { formatBRL, formatDate, computePaymentCycle, computePaymentCycleForInstant, nowBR, toDateOnly } from "@/lib/financial";
 import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
 import type { UserRow } from "@/types/database";
@@ -113,8 +113,8 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
   return (
     <div className="space-y-6 max-w-6xl">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="font-display text-3xl tracking-tight">Financeiro</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           {isOwner
             ? "Receita total por ciclo quinzenal"
             : "Seus ganhos por álbum produzido"}
@@ -124,7 +124,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
       {/* Cycle cards */}
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Closed cycle */}
-        <Card className={`border-2 ${closedSummary ? "border-amber-500/40 bg-amber-500/5" : "border-border/40 bg-card/30 opacity-60"}`}>
+        <Card className={cn("border-t-2", closedSummary ? "border-t-amber-500/60" : "border-t-border/40 opacity-60")}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
           <CardContent className="space-y-3">
             {closedSummary ? (
               <>
-                <p className="text-3xl font-bold tabular-nums">
+                <p className="font-display text-3xl tabular-nums text-foreground">
                   {formatBRL(myEarnings(closedSummary))}
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -170,13 +170,13 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
                 )}
               </>
             ) : (
-              <p className="text-3xl font-bold text-muted-foreground/40">—</p>
+              <p className="font-display text-3xl text-muted-foreground/40">—</p>
             )}
           </CardContent>
         </Card>
 
         {/* Open cycle */}
-        <Card className="border-2 border-[hsl(var(--brand-blue)/0.4)] bg-[hsl(var(--brand-blue)/0.05)]">
+        <Card className="border-t-2 border-t-[hsl(var(--brand-blue)/0.6)]">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-3xl font-bold tabular-nums">
+            <p className="font-display text-3xl tabular-nums text-foreground">
               {formatBRL(myEarnings(openSummary))}
             </p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -259,7 +259,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
           </CardHeader>
           <CardContent className="space-y-2">
             {diagramadorEarnings.map((u) => (
-              <div key={u.userId} className="flex items-center justify-between rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
+              <div key={u.userId} className="flex items-center justify-between glass-chip rounded-xl px-3 py-2.5">
                 <div>
                   <p className="text-sm font-medium">
                     {u.name}
@@ -299,7 +299,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
                   ? `Total em ${monthSummaries.length} mês${monthSummaries.length !== 1 ? "es" : ""}`
                   : `Pagamentos anteriores · total em ${historySummaries.length} ciclo${historySummaries.length !== 1 ? "s" : ""}`}
               </CardDescription>
-              <div className="inline-flex items-center rounded-lg border border-border/50 p-0.5 text-xs">
+              <div className="inline-flex items-center glass-chip rounded-xl p-0.5 text-xs">
                 <Link
                   href="?view=ciclo"
                   className={cn(
@@ -324,7 +324,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
           <CardContent className="space-y-2">
             {byMonth
               ? monthSummaries.map((m) => (
-                  <div key={m.monthKey} className="rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
+                  <div key={m.monthKey} className="glass-chip rounded-xl px-3 py-2.5">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium capitalize">{m.label}</p>
@@ -350,7 +350,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
                   </div>
                 ))
               : historySummaries.map((c) => (
-                  <div key={c.paymentDate} className="rounded-lg border border-border/50 bg-card/30 px-3 py-2.5">
+                  <div key={c.paymentDate} className="glass-chip rounded-xl px-3 py-2.5">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">Ciclo {c.label}</p>
@@ -382,7 +382,7 @@ export default async function FinancialPage({ searchParams }: FinancialPageProps
       )}
 
       {summaries.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-16 text-center">
+        <div className="flex flex-col items-center justify-center glass border-dashed py-16 text-center">
           <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-3" />
           <p className="text-sm font-medium">
             {isCriador ? "Nenhum álbum enviado ainda" : "Nenhum álbum seu foi enviado ainda"}

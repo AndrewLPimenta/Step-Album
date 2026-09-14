@@ -6,7 +6,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FolderOpen, ImageOff, Copy } from "lucide-react";
+import Link from "next/link";
+import { FolderOpen, ImageOff, Copy } from "@/lib/icons";
+import { Button } from "@/components/ui/button";
 import { ALBUM_STATUS_LABELS, ALBUM_STATUS_STYLES } from "@/lib/constants";
 import type { AlbumStatus, AlbumType, UserRow } from "@/types/database";
 import { FilaQueue } from "@/components/fila/fila-queue";
@@ -102,9 +104,9 @@ export default async function FilaPage() {
   const visibleUsers = isCriador ? users : users.filter((u) => u.id === profile.id);
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Fila de trabalho</h1>
+        <h1 className="font-display text-3xl tracking-tight">Fila de trabalho</h1>
         <p className="text-sm text-muted-foreground">
           Ciclo {currentCycle.label} · {activeAlbums.length} álbum{activeAlbums.length !== 1 ? "ns" : ""} em andamento
         </p>
@@ -149,11 +151,15 @@ export default async function FilaPage() {
         <EmptyState
           icon={FolderOpen}
           title="Fila vazia"
-          // Nomear o ciclo importa: a fila filtra por cycle_start === ciclo
-          // atual, entao "vazia" pode significar tanto trabalho em dia quanto
-          // rollover de ciclo que nao rodou. Sem a data as duas situacoes
-          // ficam identicas na tela.
-          description={`Nenhum álbum em andamento no ciclo atual, iniciado em ${formatDate(currentCycle.cycleStart)}.`}
+          // Nomear a data do ciclo importa: a fila filtra por cycle_start ===
+          // ciclo atual, entao sem ela "vazia" nao diz de QUAL recorte se
+          // esta' falando.
+          description={`Nenhum álbum em andamento no ciclo iniciado em ${formatDate(currentCycle.cycleStart)}. Novos álbuns aparecem aqui assim que forem criados.`}
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/albums">Ver todos os álbuns</Link>
+            </Button>
+          }
           className="py-16"
         />
       )}

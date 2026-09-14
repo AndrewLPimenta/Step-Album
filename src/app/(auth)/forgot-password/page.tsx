@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import Image from "next/image";
 import { resetPasswordAction } from "@/server/actions/auth";
-import { Loader2, ArrowLeft, Mail } from "lucide-react";
+import { Loader2, ArrowLeft, Mail } from "@/lib/icons";
 
 export default function ForgotPasswordPage() {
   const [isPending, startTransition] = useTransition();

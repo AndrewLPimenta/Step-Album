@@ -10,7 +10,7 @@ export default async function UsersPage() {
   return (
     <div className="space-y-5 max-w-6xl">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
+        <h1 className="font-display text-3xl tracking-tight">Usuários</h1>
         <p className="text-sm text-muted-foreground">
           Gerenciamento de Pessoas
         </p>

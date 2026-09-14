@@ -18,7 +18,12 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ["var(--font-sans)", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        // -apple-system na frente: em macOS/iOS resolve pra San Francisco.
+        // Fora da Apple cai no Inter (--font-sans), o substituto mais proximo.
+        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "var(--font-sans)", "Segoe UI", "sans-serif"],
+        // Numeros grandes e headlines: mesma familia, pesos de display. Era
+        // uma serifada (Fraunces) ate' a virada pra tipografia Apple.
+        display: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "var(--font-display)", "Segoe UI", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",

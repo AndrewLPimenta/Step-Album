@@ -26,7 +26,7 @@ import {
 import { ALL_PROBLEM_TYPES, PROBLEM_LABELS } from "@/lib/constants";
 import { relativeTime } from "@/lib/utils";
 import type { AlbumProblemRow, ProblemType } from "@/types/database";
-import { Check, X, AlertCircle, Loader2, Plus } from "lucide-react";
+import { Check, X, AlertCircle, Loader2, Plus } from "@/lib/icons";
 import { toast } from "sonner";
 
 interface ProblemsPanelProps {
@@ -102,7 +102,7 @@ export function ProblemsPanel({ albumId, problems }: ProblemsPanelProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {showForm && (
-          <div className="space-y-3 rounded-lg border border-border/60 p-3 bg-muted/30 animate-slide-up">
+          <div className="space-y-3 glass-chip rounded-xl p-3 bg-muted/30 animate-slide-up">
             <Select
               value={problem}
               onValueChange={(v) => setProblem(v as ProblemType)}

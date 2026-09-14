@@ -3,14 +3,16 @@ import {
   Wallet,
   Users as UsersIcon,
   FileImage,
+  FolderOpen,
+  Library,
   ListTodo,
   Target,
   Paperclip,
   CalendarRange,
   MonitorDown,
   HardDriveDownload,
-  type LucideIcon,
-} from "lucide-react";
+  type AppIcon,
+} from "@/lib/icons";
 import type {
   AlbumStatus,
   AlbumType,
@@ -37,7 +39,7 @@ export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
 export interface NavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: AppIcon;
   group: NavGroup;
   criadorOnly?: boolean;
   /**
@@ -75,6 +77,52 @@ export const NAV_ITEMS: NavItem[] = [
 export function navItemsForRole(role: UserRole): NavItem[] {
   return NAV_ITEMS.filter((item) => !item.criadorOnly || role === "criador");
 }
+
+/** Item do aside: um link direto ou um grupo que abre. */
+export type SidebarNode =
+  | { kind: "item"; href: string }
+  | {
+      kind: "group";
+      id: string;
+      label: string;
+      icon: AppIcon;
+      /** hrefs de NAV_ITEMS, na ordem em que aparecem dentro do grupo. */
+      children: string[];
+    };
+
+/**
+ * Estrutura e ordem do aside. Vive separada do NAV_ITEMS de proposito: la' a
+ * ordem e' por dominio (e alimenta a barra inferior do mobile e o titulo do
+ * header), aqui e' por leitura — primeiro o que se OLHA (Dashboard,
+ * Financeiro, Metas), depois o que se ABRE pra trabalhar. Dez links soltos
+ * numa coluna faziam a /fila e o /app terem o mesmo peso visual.
+ *
+ * O /app nao entra aqui: virou o rodape "Baixar app", que e' o que ele e' —
+ * algo que se usa uma vez, nao um destino do menu.
+ */
+export const SIDEBAR_TREE: SidebarNode[] = [
+  { kind: "item", href: "/dashboard" },
+  { kind: "item", href: "/financial" },
+  { kind: "item", href: "/metas" },
+  {
+    kind: "group",
+    id: "recursos",
+    label: "Recursos",
+    icon: FolderOpen,
+    children: ["/arquivos", "/transferencias"],
+  },
+  {
+    kind: "group",
+    id: "albums",
+    label: "Álbuns",
+    icon: Library,
+    children: ["/fila", "/albums", "/sprint"],
+  },
+  { kind: "item", href: "/users" },
+];
+
+/** Rodape do aside — download do app de desktop. */
+export const SIDEBAR_FOOTER_HREF = "/app";
 
 /**
  * Titulo da pagina atual. Deriva do proprio NAV_ITEMS — antes o header tinha

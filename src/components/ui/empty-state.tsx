@@ -1,8 +1,8 @@
-import type { LucideIcon } from "lucide-react";
+import type { AppIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
-  icon: LucideIcon;
+  icon: AppIcon;
   title: string;
   /** Uma linha. Se der pra dizer QUAL recorte esta vazio (o ciclo, o filtro), diga. */
   description?: string;
@@ -27,11 +27,11 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 px-6 py-10 text-center",
+        "glass flex flex-col items-center justify-center gap-3 border-dashed px-6 py-10 text-center",
         className,
       )}
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="glass-chip flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground">
         <Icon className="h-5 w-5" aria-hidden="true" />
       </div>
       <div className="space-y-1">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, TriangleAlert } from "lucide-react";
+import { Check, Copy, TriangleAlert } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 
 export default function GlobalError({

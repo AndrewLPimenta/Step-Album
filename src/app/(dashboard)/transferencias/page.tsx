@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { TransferenciasPanel } from "@/components/transferencias/transferencias-panel";
 import { Card, CardContent } from "@/components/ui/card";
-import { HardDriveDownload } from "lucide-react";
+import { HardDriveDownload } from "@/lib/icons";
 
 export interface DispositivoDaEquipe {
   user_id: string;
@@ -57,7 +57,7 @@ export default async function TransferenciasPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Transferências</h1>
+        <h1 className="font-display text-3xl tracking-tight">Transferências</h1>
         <p className="text-sm text-muted-foreground">
           Os códigos que ligam as máquinas da equipe para trocar pastas de
           álbuns, de qualquer tamanho.

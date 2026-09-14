@@ -6,10 +6,11 @@ import {
   Search,
   SearchX,
   X,
+  ArrowRight,
   ChevronDown,
   ChevronRight,
   Download,
-} from "lucide-react";
+} from "@/lib/icons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,6 +43,20 @@ import type { AlbumStatus, AlbumType } from "@/types/database";
 const ACTIVE_STATUSES: AlbumStatus[] = ["baixado", "editando", "montado", "enviado", "concluido", "descartado"];
 const INUTILIZAVEL_STATUSES: AlbumStatus[] = ["fotos_insuficientes", "duplicado"];
 const BULK_STATUSES: AlbumStatus[] = [...ACTIVE_STATUSES, ...INUTILIZAVEL_STATUSES];
+/**
+ * Proximo passo do fluxo de producao. E' o que permite avancar UM album sem
+ * passar pela selecao: antes, tirar um album de "baixado" custava marcar a
+ * caixa, abrir o menu de status e escolher — tres cliques pro caso mais
+ * comum do dia. Estados fora do fluxo (descartado, duplicado,
+ * fotos_insuficientes) ficam de fora de proposito: nao ha "proximo" neles.
+ */
+const NEXT_STATUS: Partial<Record<AlbumStatus, AlbumStatus>> = {
+  baixado: "editando",
+  editando: "montado",
+  montado: "enviado",
+  enviado: "concluido",
+};
+
 const TYPE_FILTER_ALL = "todos";
 const RESPONSIBLE_FILTER_ALL = "todos";
 
@@ -240,6 +255,21 @@ export function FilaQueue({ albums, users }: Props) {
     });
   }
 
+  function handleAdvance(album: FilaAlbum) {
+    const next = NEXT_STATUS[album.status];
+    if (!next) return;
+    applyOptimistic([album.id], { status: next });
+    startTransition(async () => {
+      const res = await bulkUpdateStatusAction([album.id], next);
+      if (res.ok) {
+        toast.success(`${album.student_name} → ${ALBUM_STATUS_LABELS[next]}`);
+      } else {
+        toast.error(res.error);
+        revertOptimistic([album.id]);
+      }
+    });
+  }
+
   function handleDownload() {
     const selectedAlbums = filtered.filter((a) => selected.has(a.id));
 
@@ -367,16 +397,99 @@ export function FilaQueue({ albums, users }: Props) {
         />
       ) : (
         <>
-          {/* Select all row */}
-          <div className="flex items-center gap-2 px-1">
+          {/* Barra de acoes — fixa no topo da lista, nao flutuante ao
+              selecionar. As acoes em lote ficam visiveis (desabilitadas) antes
+              de qualquer selecao: a barra antiga so' existia DEPOIS de marcar
+              algo, entao quem nunca marcou nada nao sabia que elas existiam.
+              Sticky porque a lista e' longa — rolando, ela continua ao
+              alcance sem precisar voltar ao topo. */}
+          <div className="glass-chip sticky top-[4.75rem] z-20 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2">
             <Checkbox
               checked={allSelected}
               onCheckedChange={toggleAll}
               aria-label="Selecionar todos"
             />
             <span className="text-xs text-muted-foreground">
-              {someSelected ? `${selected.size} selecionado${selected.size !== 1 ? "s" : ""}` : `Selecionar todos (${filtered.length})`}
+              {someSelected
+                ? `${selected.size} selecionado${selected.size !== 1 ? "s" : ""}`
+                : `Selecionar todos (${filtered.length})`}
             </span>
+            {filtered.length !== albums.length && (
+              <span className="text-xs text-muted-foreground/70">
+                · {filtered.length} de {albums.length}
+              </span>
+            )}
+
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {!someSelected && (
+                <span className="hidden text-xs text-muted-foreground/70 sm:inline">
+                  Marque álbuns para agir em lote
+                </span>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!someSelected || isPending}
+                  >
+                    Mudar status
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {BULK_STATUSES.map((st) => (
+                    <DropdownMenuItem key={st} onSelect={() => handleBulkStatus(st)}>
+                      {ALBUM_STATUS_LABELS[st]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!someSelected || isPending}
+                  >
+                    Mudar responsável
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {users.map((u) => (
+                    <DropdownMenuItem key={u.id} onSelect={() => handleBulkReassign(u.id)}>
+                      {u.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                disabled={!someSelected || isPending}
+                title="Baixar no Kaz (você precisa estar logado)"
+              >
+                <Download className="mr-1 h-3.5 w-3.5" />
+                Baixar Kaz
+              </Button>
+
+              {someSelected && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelected(new Set())}
+                  disabled={isPending}
+                  aria-label="Limpar seleção"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Album list grouped by user */}
@@ -405,7 +518,7 @@ export function FilaQueue({ albums, users }: Props) {
                   {!isCollapsed && (
                   <>
                   {/* Desktop */}
-                  <div className="hidden md:block rounded-lg border border-border/50 overflow-hidden">
+                  <div className="hidden md:block glass-chip rounded-xl overflow-hidden">
                     {userAlbums.map((album, idx) => {
                       const code = [album.class_code, album.student_code].filter(Boolean).join("·") || null;
                       const isChecked = selected.has(album.id);
@@ -446,6 +559,11 @@ export function FilaQueue({ albums, users }: Props) {
                               currentUserId={album.responsible_id}
                               users={users}
                             />
+                            <AdvanceButton
+                              album={album}
+                              disabled={isPending}
+                              onAdvance={handleAdvance}
+                            />
                           </div>
                         </div>
                       );
@@ -461,7 +579,7 @@ export function FilaQueue({ albums, users }: Props) {
                       return (
                         <div
                           key={album.id}
-                          className={`rounded-lg border border-border/50 bg-card/30 px-3 py-2.5 space-y-1.5 select-none ${isChecked ? "border-primary/40 bg-accent/30" : ""}`}
+                          className={`glass-chip rounded-xl px-3 py-2.5 space-y-1.5 select-none ${isChecked ? "border-primary/40 bg-accent/30" : ""}`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <Checkbox
@@ -487,6 +605,13 @@ export function FilaQueue({ albums, users }: Props) {
                               currentUserId={album.responsible_id}
                               users={users}
                             />
+                            <div className="ml-auto">
+                              <AdvanceButton
+                                album={album}
+                                disabled={isPending}
+                                onAdvance={handleAdvance}
+                              />
+                            </div>
                           </div>
                         </div>
                       );
@@ -501,66 +626,37 @@ export function FilaQueue({ albums, users }: Props) {
         </>
       )}
 
-      {/* Bulk action bar */}
-      {someSelected && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-xl px-4 py-3">
-          <span className="text-sm font-medium mr-1">
-            {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
-          </span>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={isPending}>
-                Mudar status
-                <ChevronDown className="h-3.5 w-3.5 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center">
-              {BULK_STATUSES.map((s) => (
-                <DropdownMenuItem key={s} onSelect={() => handleBulkStatus(s)}>
-                  {ALBUM_STATUS_LABELS[s]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={isPending}>
-                Mudar responsável
-                <ChevronDown className="h-3.5 w-3.5 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center">
-              {users.map((u) => (
-                <DropdownMenuItem key={u.id} onSelect={() => handleBulkReassign(u.id)}>
-                  {u.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownload}
-            disabled={isPending}
-            title="Baixar no Kaz (você precisa estar logado)"
-          >
-            <Download className="h-3.5 w-3.5 mr-1" />
-            Baixar Kaz
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelected(new Set())}
-            disabled={isPending}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
     </div>
+  );
+}
+
+/**
+ * Avanca um album para o proximo passo do fluxo. Rotulo com o nome do
+ * destino, nao um "→" mudo: o que importa saber antes de clicar e' pra onde
+ * o album vai, nao que ele vai andar.
+ */
+function AdvanceButton({
+  album,
+  disabled,
+  onAdvance,
+}: {
+  album: FilaAlbum;
+  disabled: boolean;
+  onAdvance: (album: FilaAlbum) => void;
+}) {
+  const next = NEXT_STATUS[album.status];
+  if (!next) return null;
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+      disabled={disabled}
+      onClick={() => onAdvance(album)}
+      title={`Marcar ${album.student_name} como ${ALBUM_STATUS_LABELS[next]}`}
+    >
+      {ALBUM_STATUS_LABELS[next]}
+      <ArrowRight className="ml-1 h-3 w-3" weight="bold" />
+    </Button>
   );
 }

@@ -69,7 +69,7 @@ export default async function SprintPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sprint</h1>
+        <h1 className="font-display text-3xl tracking-tight">Sprint</h1>
         <p className="text-sm text-muted-foreground">
           Seus álbuns do ciclo {ciclo.label}, repartidos pelos dias que faltam.
           Conforme você marca como enviado na Fila, eles saem daqui.

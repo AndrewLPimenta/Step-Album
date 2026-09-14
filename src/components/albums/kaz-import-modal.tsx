@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Upload, ArrowLeft, Loader2, BookOpen, AlertTriangle } from "lucide-react";
+import { Upload, ArrowLeft, Loader2, BookOpen, AlertTriangle } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";

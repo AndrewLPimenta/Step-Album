@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Wallet, CalendarClock } from "lucide-react";
+import { ArrowLeft, Wallet, CalendarClock } from "@/lib/icons";
 import { formatBRL, formatDate } from "@/lib/financial";
 
 export default async function AlbumDetailPage({
@@ -45,7 +45,7 @@ export default async function AlbumDetailPage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="font-display text-3xl tracking-tight">
               {album.student_name}
             </h1>
             <StatusBadge status={album.status} />

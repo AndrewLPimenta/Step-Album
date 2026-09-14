@@ -57,6 +57,27 @@
     --type-faculdade: 225 73% 57%;
     --type-especial: 271 71% 55%;
     --type-medicina: 38 92% 40%;
+
+    /* Liquid glass — superficie e aurora. Sao cores prontas (com alfa
+       embutido), nao triplas HSL: use direto em background/border, sem
+       hsl(). As auroras (--a1..--a4) pintam o fundo colorido atras das
+       superficies; sem elas o backdrop-filter nao tem o que borrar. */
+    --glass: hsl(0 0% 100% / 0.44);
+    --brd: hsl(0 0% 100% / 0.72);
+    --inset: inset 0 1px 0 hsl(0 0% 100% / 0.92);
+    --sh: 0 20px 42px -26px hsl(240 30% 25% / 0.5);
+    --chip: hsl(0 0% 100% / 0.6);
+    --chip-brd: hsl(0 0% 100% / 0.85);
+    --a1: hsl(225 73% 57% / 0.42);
+    --a2: hsl(45 100% 50% / 0.38);
+    --a3: hsl(25 90% 52% / 0.36);
+    --a4: hsl(217 91% 60% / 0.28);
+
+    /* Tinta de texto das cores de marca. O ambar puro (#FFBF00) rende 1.65:1
+       sobre branco — serve de fundo e de halo, nunca de texto. Estas duas
+       sao as versoes escurecidas que passam nos 4.5:1 da WCAG AA. */
+    --ink-blue: 225 73% 42%;
+    --ink-amber: 38 92% 30%;
   }
 
   .dark {
@@ -103,6 +124,141 @@
     --type-faculdade: 225 73% 70%;
     --type-especial: 271 76% 74%;
     --type-medicina: 45 95% 60%;
+
+    --glass: hsl(240 8% 12% / 0.58);
+    --brd: hsl(0 0% 100% / 0.11);
+    --inset: inset 0 1px 0 hsl(0 0% 100% / 0.09);
+    --sh: 0 22px 46px -24px hsl(240 40% 2% / 0.85);
+    --chip: hsl(240 8% 18% / 0.7);
+    --chip-brd: hsl(0 0% 100% / 0.12);
+    --a1: hsl(225 73% 57% / 0.38);
+    --a2: hsl(45 100% 50% / 0.28);
+    --a3: hsl(25 90% 52% / 0.32);
+    --a4: hsl(217 91% 60% / 0.24);
+
+    /* No escuro o problema se inverte: a tinta precisa clarear. */
+    --ink-blue: 225 73% 74%;
+    --ink-amber: 45 95% 62%;
+  }
+}
+
+/* Camada liquid glass. Fica em @layer components (nao em base) pra que
+   qualquer utilitario Tailwind passado via className — rounded-*, bg-*,
+   border-* — continue vencendo por especificidade de camada. */
+@layer components {
+  /* Superficie padrao: cards, paineis, dialogos. */
+  .glass {
+    border-radius: 20px;
+    background: var(--glass);
+    border: 1px solid var(--brd);
+    box-shadow: var(--sh), var(--inset);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+  }
+
+  /* Mesma materia, sem canto nem sombra — pra superficies coladas na borda
+     da tela (sidebar fixa, header sticky), onde raio e sombra dariam o
+     efeito de "card solto". */
+  .glass-flush {
+    background: var(--glass);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+  }
+
+  /* Elemento pequeno sobre vidro: chip de ciclo, badge, pilula de filtro.
+     Blur menor porque a area e' pequena — 28px ali vira so' custo de GPU. */
+  .glass-chip {
+    background: var(--chip);
+    border: 1px solid var(--chip-brd);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+  }
+
+  /* Fundo colorido do app. E' o que o backdrop-filter borra: sem essas
+     quatro manchas, todo o vidro acima vira cinza chapado. */
+  .aurora {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    height: 100vh;
+    height: 100lvh;
+    min-height: 100dvh;
+    /* z-index 0, nao -10: um filho negativo pinta ANTES do fundo dos blocos
+       em fluxo, entao qualquer ancestral com cor propria o cobre. Em 0 ele
+       fica acima do fundo e abaixo do conteudo, que vai de z-10 pra cima. */
+    z-index: 0;
+    /* Duas faixas de borda a borda (azul em cima, ambar embaixo) mais duas
+       manchas de canto. Antes eram quatro manchas de canto so': no desktop
+       a sidebar e os cards cobriam justamente os cantos, e o brilho sumia
+       — sobrava cor nas frestas de 12px. Com 130% de largura ancorada em
+       50%, a faixa atravessa a tela inteira e continua visivel acima do
+       header e abaixo do ultimo card, em qualquer resolucao. */
+    background:
+      /* topo: azul de borda a borda, mais um reforco no canto direito */
+      radial-gradient(145% 58% at 50% -8%, var(--a1), transparent 66%),
+      radial-gradient(66% 42% at 98% -4%, var(--a4), transparent 68%),
+      /* base: laranja de borda a borda, com o ambar esquentando a direita */
+      radial-gradient(150% 60% at 50% 108%, var(--a3), transparent 66%),
+      radial-gradient(72% 48% at 96% 104%, var(--a2), transparent 68%);
+  }
+
+  /* Controle de formulario sobre vidro: input, textarea, trigger de select.
+     Fundo proprio (--chip) em vez de transparente — sobre a aurora, um campo
+     transparente perde a borda de "afundado" e some. */
+  .glass-field {
+    background: var(--chip);
+    border: 1px solid var(--chip-brd);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+  }
+  .glass-field:focus-visible,
+  .glass-field:focus-within {
+    border-color: hsl(var(--brand-blue) / 0.5);
+  }
+
+  /* Botao primario: mesmo gradiente da pilula da nav, em escala menor. */
+  .btn-brand {
+    background: linear-gradient(
+      135deg,
+      #5b7fe8 0%,
+      #4169e1 62%,
+      hsl(var(--brand-amber)) 150%
+    );
+    color: #fff;
+    border: 1px solid hsl(225 73% 45% / 0.4);
+    box-shadow:
+      0 12px 22px -12px hsl(225 73% 45% / 0.8),
+      inset 0 1px 0 hsl(0 0% 100% / 0.35);
+  }
+  .btn-brand:hover {
+    filter: brightness(1.06);
+  }
+
+  /* Item ativo da nav: pilula azul->ambar. O stop do ambar passa de 100%
+     de proposito — assim so' o canto inferior direito esquenta e o texto
+     branco continua sobre azul (contraste), em vez de virar ambar/branco. */
+  .nav-pill-active {
+    background: linear-gradient(
+      135deg,
+      #5b7fe8 0%,
+      #4169e1 62%,
+      hsl(var(--brand-amber)) 138%
+    );
+    color: #fff;
+    box-shadow:
+      0 14px 26px -14px hsl(225 73% 45% / 0.85),
+      inset 0 1px 0 hsl(0 0% 100% / 0.4);
+  }
+
+  /* Trilho de barra de progresso: o sulco interno e' o que faz a barra
+     parecer embutida no vidro em vez de colada por cima. */
+  .progress-track {
+    box-shadow: inset 0 1px 2px hsl(240 30% 25% / 0.12);
+  }
+  .dark .progress-track {
+    box-shadow: inset 0 1px 2px hsl(240 40% 2% / 0.5);
   }
 }
 
@@ -114,36 +270,44 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  html {
+    /* So' o html pinta a cor de fundo. No mobile, a area sob a barra do
+       navegador e a do overscroll herdam daqui. */
+    background-color: hsl(var(--background));
+    min-height: 100dvh;
+  }
   body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    /* Sem cor propria de proposito: o fundo do body e' pintado DEPOIS dos
+       filhos posicionados de z-index negativo, entao qualquer cor aqui
+       enterra a aurora. Quem pinta e' o html, acima. */
+    @apply text-foreground;
+    background-color: transparent;
+    min-height: 100dvh;
+    /* -apple-system primeiro: em macOS/iOS isso resolve pra San Francisco,
+       que e' a referencia. Fora da Apple cai no Inter, o mais proximo. */
+    font-family:
+      -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-sans),
+      "Segoe UI", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
     letter-spacing: -0.011em;
   }
 
-  /* App backdrop */
-  .app-backdrop {
-    background:
-      radial-gradient(
-        ellipse 80% 50% at 50% -20%,
-        hsl(var(--brand-blue) / 0.07),
-        transparent
-      ),
-      hsl(var(--background));
+  /* Titulos e numeros grandes: mesma familia, so' mais apertados — e' o que
+     da o ar de SF Pro Display em vez de "texto grande". */
+  h1,
+  h2,
+  h3,
+  .font-display {
+    letter-spacing: -0.022em;
   }
-  .dark .app-backdrop {
-    background:
-      radial-gradient(
-        ellipse 60% 40% at 50% -10%,
-        hsl(var(--brand-blue) / 0.09),
-        transparent
-      ),
-      radial-gradient(
-        ellipse 30% 20% at 80% 100%,
-        hsl(var(--brand-amber) / 0.04),
-        transparent
-      ),
-      hsl(var(--background));
+
+  /* App backdrop — editorial: quase plano, so' um traco de marca no topo
+     (era um glow bem mais forte; a referencia visual adotada e' de fundo
+     liso/paper, nao "glass SaaS demo"). */
+  /* Mantida so' como gancho de classe — quem pinta o fundo agora e' o html.
+     Pintar aqui (no body) cobriria a aurora. */
+  .app-backdrop {
+    background: transparent;
   }
 
   /* Gradient text utility */

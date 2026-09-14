@@ -28,7 +28,7 @@ import {
   Trash2,
   AlertCircle,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { formatDate } from "@/lib/financial";
 import { relativeTime } from "@/lib/utils";
 import { deleteAlbumAction, bulkDeleteAction } from "@/server/actions/albums";
@@ -152,7 +152,7 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
           return (
             <div
               key={album.id}
-              className={`rounded-xl border bg-card/40 p-4 space-y-3 select-none transition-colors ${
+              className={`glass p-4 space-y-3 select-none transition-colors ${
                 isChecked ? "border-primary/40 bg-accent/30" : "border-border/60"
               }`}
             >
@@ -244,7 +244,7 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
       </div>
 
       {/* ── Desktop: tabela ── */}
-      <div className="hidden md:block rounded-xl border border-border/60 bg-card/40 overflow-hidden">
+      <div className="hidden md:block glass overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -377,7 +377,7 @@ export function AlbumsTable({ rows, isAdmin }: AlbumsTableProps) {
 
       {/* Bulk action bar */}
       {someSelected && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-border bg-card shadow-xl px-4 py-3">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 glass shadow-2xl px-4 py-3">
           <span className="text-sm font-medium mr-1">
             {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
           </span>

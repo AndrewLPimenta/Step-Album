@@ -8,7 +8,7 @@ import {
 } from "@/components/albums/albums-table";
 import { KazImportModal } from "@/components/albums/kaz-import-modal";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus } from "@/lib/icons";
 import type { AlbumStatus, AlbumType } from "@/types/database";
 
 interface PageProps {
@@ -46,10 +46,10 @@ export default async function AlbumsPage({ searchParams }: PageProps) {
   ]);
 
   return (
-    <div className="space-y-5 max-w-7xl">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Álbuns</h1>
+          <h1 className="font-display text-3xl tracking-tight">Álbuns</h1>
           <p className="text-sm text-muted-foreground">
             {isAdmin
               ? "Todos os álbuns da equipe"
