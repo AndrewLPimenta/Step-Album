@@ -12,8 +12,12 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   albumEarning,
+  buildCycleSummaries,
+  computeDiagramadorEarnings,
   getMyGoal,
+  isCommissioned,
   listAlbumsForAnalytics,
+  type CycleAlbum,
   type UserWithRate,
 } from "@/lib/queries";
 import {
@@ -34,8 +38,12 @@ import type { AlbumStatus, AlbumType } from "@/types/database";
 
 import { StatCard } from "@/components/dashboard/stat-card";
 import {
+  CycleTrendChart,
   RevenueAreaChart,
+  StatusDonutChart,
+  type CyclePoint,
   type RevenueSeries,
+  type StatusSlice,
 } from "@/components/dashboard/charts";
 import { PaymentAlbumsButton } from "@/components/dashboard/payment-albums-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -61,6 +69,19 @@ const TYPE_TOKEN: Record<AlbumType, string> = {
   especial: "--type-especial",
 };
 
+/** Cobre TODOS os status, inclusive fora do fluxo — a rosca mostra proporcao
+    de tudo que esta' no ciclo, nao so' as 5 etapas normais. */
+const STATUS_TOKEN: Record<AlbumStatus, string> = {
+  baixado: "--status-idle",
+  editando: "--status-active",
+  montado: "--status-assembled",
+  enviado: "--status-sent",
+  concluido: "--status-done",
+  descartado: "--status-excluded",
+  duplicado: "--status-excluded",
+  fotos_insuficientes: "--status-problem",
+};
+
 function shortDay(d: Date) {
   return `${String(d.getDate()).padStart(2, "0")} ${MONTH_NAMES_PT[d.getMonth()]}`;
 }
@@ -78,7 +99,10 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
   const albums = await listAlbumsForAnalytics();
-  const { data: users } = await supabase.from("users").select("id, name");
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, name, role, commission_rate");
+  const usersWithRate = (users ?? []) as UserWithRate[];
   const goal = await getMyGoal(profile.id);
 
   // ---------------------------------------------------------------- ciclos
@@ -106,17 +130,37 @@ export default async function DashboardPage() {
   const isSent = (a: Album) =>
     a.status === "enviado" || a.status === "concluido";
   const mine = albums.filter((a) => a.responsible_id === profile.id);
-  const earn = (a: Album) => albumEarning(me, a.type, Number(a.value));
+
+  // "Dono" (criador sem commission_rate) recebe o valor cheio do album,
+  // comissionado recebe o repasse fixo — mesma regra do /financial.
+  const isOwner = isCriador && !isCommissioned(me);
+  const earnFor = (a: Album) =>
+    isOwner ? Number(a.value) : albumEarning(me, a.type, Number(a.value));
+
+  // Criador ve' a receita de TODA a equipe (RLS ja' devolve todos os albuns
+  // pra criador); admin/diagramador ve' so' os proprios — RLS ja' limita
+  // `albums` aos proprios registros nesse caso, entao scopeAlbums == mine.
+  const scopeAlbums = isCriador ? albums : mine;
 
   // ------------------------------------------------------------- faturamento
-  const cycleSent = mine.filter((a) => isSent(a) && a.payment_date === payKey);
-  const prevSent = mine.filter(
+  const cycleSent = scopeAlbums.filter(
+    (a) => isSent(a) && a.payment_date === payKey,
+  );
+  const prevSent = scopeAlbums.filter(
     (a) => isSent(a) && a.payment_date === prevPayKey,
   );
-  const cycleRevenue = cycleSent.reduce((s, a) => s + earn(a), 0);
-  const prevRevenue = prevSent.reduce((s, a) => s + earn(a), 0);
+  const cycleRevenue = cycleSent.reduce((s, a) => s + earnFor(a), 0);
+  const prevRevenue = prevSent.reduce((s, a) => s + earnFor(a), 0);
   const delta =
     prevRevenue > 0 ? (cycleRevenue - prevRevenue) / prevRevenue : null;
+
+  // Meta pessoal e' sempre do PROPRIO usuario, mesmo pro criador (que pode
+  // ter --ou nao-- albuns proprios atribuidos) — nunca a receita da equipe,
+  // entao usa sempre `mine`, nunca `scopeAlbums`.
+  const myCycleSent = mine.filter(
+    (a) => isSent(a) && a.payment_date === payKey,
+  );
+  const myCycleRevenue = myCycleSent.reduce((s, a) => s + earnFor(a), 0);
 
   // --------------------------------------------------------- ciclo em aberto
   // cycle_start e' o campo autoritativo de "a que ciclo este album pertence"
@@ -157,8 +201,10 @@ export default async function DashboardPage() {
   // ------------------------------------------------------------------- meta
   const goalValue =
     goal && goal.goal_type === "valor" ? Number(goal.goal_value) : null;
-  const goalPct = goalValue ? Math.min(1, cycleRevenue / goalValue) : null;
-  const goalMissing = goalValue ? Math.max(0, goalValue - cycleRevenue) : null;
+  const goalPct = goalValue ? Math.min(1, myCycleRevenue / goalValue) : null;
+  const goalMissing = goalValue
+    ? Math.max(0, goalValue - myCycleRevenue)
+    : null;
 
   // ---------------------------------------------------- serie do grafico
   function series(
@@ -172,7 +218,7 @@ export default async function DashboardPage() {
     const byDay = new Map<string, number>();
     for (const a of rows) {
       const k = toDateOnly(earnedAt(a));
-      byDay.set(k, (byDay.get(k) ?? 0) + earn(a));
+      byDay.set(k, (byDay.get(k) ?? 0) + earnFor(a));
     }
     const points: RevenueSeries["points"] = [];
     const cursor = new Date(from);
@@ -206,7 +252,9 @@ export default async function DashboardPage() {
 
   const cycleTo = today < cycle.cycleEnd ? today : cycle.cycleEnd;
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthSent = mine.filter((a) => isSent(a) && earnedAt(a) >= monthStart);
+  const monthSent = scopeAlbums.filter(
+    (a) => isSent(a) && earnedAt(a) >= monthStart,
+  );
 
   const revenueSeries: RevenueSeries[] = [
     series(
@@ -301,6 +349,66 @@ export default async function DashboardPage() {
     : [];
   const byUserMax = Math.max(1, ...byUser.map((u) => u.count));
 
+  // sentAll: todo o historico de envios (nao so' o ciclo atual), no escopo
+  // de quem esta' olhando — criador ve' o da equipe inteira, os demais so'
+  // o proprio (RLS ja' garante isso pra `albums`, `scopeAlbums` so' deixa
+  // explicito). Base dos tres widgets "historico" abaixo — nenhum deles
+  // deve se prender so' ao ciclo atual.
+  const sentAll = scopeAlbums.filter(
+    (a) => isSent(a) && a.payment_date,
+  ) as unknown as CycleAlbum[];
+
+  // ---------------------------------------------- receita por diagramador
+  // Ganhos acumulados de CADA pessoa em toda a historia, nao so' o ciclo
+  // atual — separado do "Por diagramador" acima, que e' carga de trabalho
+  // (qualquer status, so' o ciclo aberto).
+  const diagramadorEarnings = isCriador
+    ? computeDiagramadorEarnings(sentAll, usersWithRate)
+    : [];
+  const diagramadorEarningsMax = Math.max(
+    1,
+    ...diagramadorEarnings.map((u) => u.earnings),
+  );
+
+  // -------------------------------------------------- tendencia de ciclos
+  // Todos os ciclos com pelo menos um album enviado, do mais antigo ao mais
+  // recente — nao so' os ultimos. Criador ve' receita bruta da organizacao
+  // (mesmo numero do /financial); diagramador/admin ve' so' os proprios
+  // ganhos, igual ao resto da pagina.
+  const cycleSummaries = buildCycleSummaries(
+    sentAll,
+    usersWithRate,
+    today,
+  ).reverse();
+  const trendPoints: CyclePoint[] = cycleSummaries.map((s) => ({
+    key: s.paymentDate,
+    label: shortDay(new Date(`${s.paymentDate}T12:00:00`)),
+    value: isCriador
+      ? s.total
+      : (s.byUser.find((u) => u.userId === profile.id)?.earnings ?? 0),
+    isCurrent: s.paymentDate === payKey,
+  }));
+
+  // ------------------------------------------- distribuicao por status
+  // Todo o historico (inclusive descartado/duplicado), nao so' o ciclo
+  // atual — "Fluxo de producao" acima ja' cobre o instantaneo do ciclo
+  // aberto, esta rosca responde "no total, como as coisas terminam".
+  const statusCounts = new Map<AlbumStatus, number>();
+  for (const a of scopeAlbums) {
+    const s = a.status as AlbumStatus;
+    statusCounts.set(s, (statusCounts.get(s) ?? 0) + 1);
+  }
+  const statusDistribution: StatusSlice[] = Array.from(
+    statusCounts.entries(),
+  )
+    .map(([status, value]) => ({
+      key: status,
+      label: ALBUM_STATUS_LABELS[status],
+      value,
+      token: STATUS_TOKEN[status],
+    }))
+    .sort((a, b) => b.value - a.value);
+
   return (
     <div className="space-y-6">
       {/* Hero — a primeira linha responde "onde estou no ciclo" e a manchete
@@ -335,7 +443,7 @@ export default async function DashboardPage() {
       {/* KPIs — cada um leva pra tela que resolve o numero. */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Seu faturamento"
+          title={isCriador ? "Faturamento da equipe" : "Seu faturamento"}
           value={formatBRL(cycleRevenue)}
           icon={Wallet}
           href="/financial"
@@ -397,7 +505,25 @@ export default async function DashboardPage() {
         <div className="space-y-4">
           <RevenueAreaChart
             series={revenueSeries}
-            emptyHint="Nenhum álbum seu foi enviado neste período — a curva aparece quando o primeiro envio entrar."
+            description={
+              isCriador
+                ? "Todos os álbuns da equipe enviados ou concluídos."
+                : "Somente os seus álbuns enviados ou concluídos."
+            }
+            emptyHint={
+              isCriador
+                ? "Nenhum álbum da equipe foi enviado neste período — a curva aparece quando o primeiro envio entrar."
+                : "Nenhum álbum seu foi enviado neste período — a curva aparece quando o primeiro envio entrar."
+            }
+          />
+
+          <CycleTrendChart
+            points={trendPoints}
+            description={
+              isCriador
+                ? "Receita bruta da organização em todos os ciclos, do mais antigo ao atual."
+                : "Seus ganhos em todos os ciclos, do mais antigo ao atual."
+            }
           />
 
           {/* Fluxo de producao — barras horizontais, na ordem do fluxo. */}
@@ -445,6 +571,32 @@ export default async function DashboardPage() {
               </div>
             </section>
           )}
+
+          {/* Receita, nao so' contagem: complementa "Por diagramador" acima
+              mostrando quanto cada um ja' ganhou no total — nao so' o ciclo
+              atual, todo o historico de envios. */}
+          {isCriador && diagramadorEarnings.length > 0 && (
+            <section className="glass p-5">
+              <h2 className="text-base font-semibold tracking-tight">
+                Receita por diagramador
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Comissão acumulada em todo o histórico.
+              </p>
+              <div className="mt-4 space-y-2.5">
+                {diagramadorEarnings.map((u) => (
+                  <BarRow
+                    key={u.userId}
+                    label={u.name}
+                    value={u.earnings}
+                    ratio={u.earnings / diagramadorEarningsMax}
+                    token="--brand-amber"
+                    right={`${u.count} · ${formatBRL(u.earnings)}`}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -478,6 +630,11 @@ export default async function DashboardPage() {
             </div>
           </section>
 
+          <StatusDonutChart
+            data={statusDistribution}
+            description={`Todo o histórico: ${scopeAlbums.length} álbu${scopeAlbums.length === 1 ? "m" : "ns"}, incluindo o ciclo atual.`}
+          />
+
           {/* Meta pessoal */}
           <section className="glass relative overflow-hidden p-5">
             <div
@@ -498,7 +655,7 @@ export default async function DashboardPage() {
             {goalValue ? (
               <>
                 <p className="relative mt-4 flex items-baseline gap-2 font-display text-[1.9rem] font-semibold leading-none tracking-tight tabular-nums">
-                  {formatBRL(cycleRevenue)}
+                  {formatBRL(myCycleRevenue)}
                   <span className="text-sm font-medium text-muted-foreground">
                     de {formatBRL(goalValue)}
                   </span>
