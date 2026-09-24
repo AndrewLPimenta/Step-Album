@@ -292,32 +292,21 @@ export function FilaQueue({ albums, users }: Props) {
       return;
     }
 
-    // O endpoint do Kaz depende do cookie de login do Kaz, entao precisa abrir
-    // em janela propria (iframe nao manda cookie de terceiro). Todas as
-    // janelas sao abertas de forma sincrona dentro do clique; o navegador so'
-    // deixa passar a primeira ate' o usuario liberar pop-ups para o site.
-    let blocked = 0;
-    for (const kazId of toDownload) {
+    // Open synchronously via hidden <a> — avoids popup blocker
+    toDownload.forEach((kazId) => {
       const numericId = kazId.replace(/^row_/, "");
-      const w = window.open(KAZ_DOWNLOAD_URL(numericId), "_blank");
-      if (!w) { blocked++; continue; }
-      try { w.opener = null; } catch { /* cross-origin, ignora */ }
-    }
-
-    const opened = toDownload.length - blocked;
-    if (blocked > 0) {
-      toast.error(
-        `O navegador bloqueou ${blocked} de ${toDownload.length} downloads. ` +
-          `Clique no ícone de pop-up bloqueado na barra de endereço, escolha ` +
-          `"Sempre permitir pop-ups" deste site e clique em Baixar Kaz de novo.`,
-        { duration: 12_000 },
-      );
-      return;
-    }
+      const link = document.createElement("a");
+      link.href = KAZ_DOWNLOAD_URL(numericId);
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
 
     const msg = missing > 0
-      ? `${opened} download${opened !== 1 ? "s" : ""} iniciado${opened !== 1 ? "s" : ""}. ${missing} sem código ignorado${missing !== 1 ? "s" : ""}.`
-      : `${opened} download${opened !== 1 ? "s" : ""} iniciado${opened !== 1 ? "s" : ""}. Certifique-se de estar logado no Kaz.`;
+      ? `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. ${missing} sem código ignorado${missing !== 1 ? "s" : ""}.`
+      : `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. Certifique-se de estar logado no Kaz.`;
     toast.success(msg);
   }
 
