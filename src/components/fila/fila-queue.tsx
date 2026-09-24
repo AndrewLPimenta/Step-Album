@@ -292,25 +292,32 @@ export function FilaQueue({ albums, users }: Props) {
       return;
     }
 
-    // Hidden iframes — avoids popup blocker entirely.
-    // <a target="_blank"> only lets the FIRST tab through; all others are blocked.
-    // An iframe with a download URL silently triggers the browser download manager
-    // without opening new tabs and without popup-blocker interference.
-    toDownload.forEach((kazId) => {
+    // O endpoint do Kaz depende do cookie de login do Kaz, entao precisa abrir
+    // em janela propria (iframe nao manda cookie de terceiro). Todas as
+    // janelas sao abertas de forma sincrona dentro do clique; o navegador so'
+    // deixa passar a primeira ate' o usuario liberar pop-ups para o site.
+    let blocked = 0;
+    for (const kazId of toDownload) {
       const numericId = kazId.replace(/^row_/, "");
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.src = KAZ_DOWNLOAD_URL(numericId);
-      document.body.appendChild(iframe);
-      // Remove after a generous window so the request can complete
-      setTimeout(() => {
-        if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      }, 60_000);
-    });
+      const w = window.open(KAZ_DOWNLOAD_URL(numericId), "_blank");
+      if (!w) { blocked++; continue; }
+      try { w.opener = null; } catch { /* cross-origin, ignora */ }
+    }
+
+    const opened = toDownload.length - blocked;
+    if (blocked > 0) {
+      toast.error(
+        `O navegador bloqueou ${blocked} de ${toDownload.length} downloads. ` +
+          `Clique no ícone de pop-up bloqueado na barra de endereço, escolha ` +
+          `"Sempre permitir pop-ups" deste site e clique em Baixar Kaz de novo.`,
+        { duration: 12_000 },
+      );
+      return;
+    }
 
     const msg = missing > 0
-      ? `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. ${missing} sem código ignorado${missing !== 1 ? "s" : ""}.`
-      : `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. Certifique-se de estar logado no Kaz.`;
+      ? `${opened} download${opened !== 1 ? "s" : ""} iniciado${opened !== 1 ? "s" : ""}. ${missing} sem código ignorado${missing !== 1 ? "s" : ""}.`
+      : `${opened} download${opened !== 1 ? "s" : ""} iniciado${opened !== 1 ? "s" : ""}. Certifique-se de estar logado no Kaz.`;
     toast.success(msg);
   }
 

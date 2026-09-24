@@ -205,8 +205,6 @@ export default async function DashboardPage() {
   const sentThisCycle = inCycle.filter(isSent).length;
   const paceActual = sentThisCycle / daysElapsed;
   const paceNeeded = daysToTurnover > 0 ? pending.length / daysToTurnover : 0;
-  const projected = Math.round(paceActual * daysToTurnover);
-  const carryOver = Math.max(0, pending.length - projected);
 
   const byType = (Object.keys(TYPE_TOKEN) as AlbumType[])
     .map((t) => {
