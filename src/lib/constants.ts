@@ -136,6 +136,13 @@ export function navLabelForPathname(pathname: string): string | undefined {
   )?.label;
 }
 
+/** Grupo do destino atual — o nivel do meio da trilha no header. */
+export function navGroupForPathname(pathname: string): NavGroup | undefined {
+  return NAV_ITEMS.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  )?.group;
+}
+
 export const ALBUM_VALUES: Record<AlbumType, number> = {
   colab: 15,
   faculdade: 20,

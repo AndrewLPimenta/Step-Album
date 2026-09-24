@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
@@ -65,6 +66,9 @@ export function DashboardShell({
           </main>
         </div>
         <BottomNav role={role} />
+        {/* Montado uma vez no shell: o atalho global (Ctrl/Cmd+K e "/") precisa
+            valer em toda tela do painel, nao so' onde ha um gatilho visivel. */}
+        <CommandPalette role={role} />
       </div>
     </TooltipProvider>
   );

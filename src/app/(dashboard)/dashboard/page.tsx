@@ -3,8 +3,9 @@ import {
   AlertTriangle,
   ArrowRight,
   CalendarClock,
-  Layers,
+  Gauge,
   Send,
+  ShieldAlert,
   Wallet,
 } from "@/lib/icons";
 
@@ -30,13 +31,13 @@ import {
   toBrazilTime,
   toDateOnly,
 } from "@/lib/financial";
-import {
-  ALBUM_STATUS_LABELS,
-  ALBUM_TYPE_LABELS,
-} from "@/lib/constants";
+import { ALBUM_STATUS_LABELS, ALBUM_TYPE_LABELS } from "@/lib/constants";
 import type { AlbumStatus, AlbumType } from "@/types/database";
 
 import { StatCard } from "@/components/dashboard/stat-card";
+import { SectionHeader } from "@/components/dashboard/section-header";
+import { MetricList, MetricRow } from "@/components/dashboard/metric-list";
+import { FlowFunnel, type FlowStep } from "@/components/dashboard/flow-funnel";
 import {
   CycleTrendChart,
   RevenueAreaChart,
@@ -69,8 +70,7 @@ const TYPE_TOKEN: Record<AlbumType, string> = {
   especial: "--type-especial",
 };
 
-/** Cobre TODOS os status, inclusive fora do fluxo — a rosca mostra proporcao
-    de tudo que esta' no ciclo, nao so' as 5 etapas normais. */
+/** Cobre TODOS os status, inclusive fora do fluxo. */
 const STATUS_TOKEN: Record<AlbumStatus, string> = {
   baixado: "--status-idle",
   editando: "--status-active",
@@ -89,6 +89,21 @@ function shortDay(d: Date) {
 /** Data em que o album entrou pro caixa: conclusao, ou criacao se nao houver. */
 function earnedAt(a: Album): Date {
   return toBrazilTime(new Date(a.completed_at ?? a.created_at));
+}
+
+/** Meia-noite local — todo diff de "quantos dias" passa por aqui primeiro. */
+function atMidnight(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function daysBetween(a: Date, b: Date) {
+  return Math.round(
+    (atMidnight(a).getTime() - atMidnight(b).getTime()) / 86_400_000,
+  );
+}
+
+/** "1 álbum" / "273 álbuns" — plural sem repetir a condicao em cada texto. */
+function plural(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 export default async function DashboardPage() {
@@ -110,36 +125,27 @@ export default async function DashboardPage() {
   const cycleStartKey = toDateOnly(cycle.cycleStart);
   const payKey = toDateOnly(cycle.paymentDate);
 
-  // Um dia antes do inicio do ciclo atual cai, por definicao, no ciclo
-  // anterior — e' assim que se acha o par de comparacao sem repetir a regra.
   const prevCycle = computePaymentCycle(
     new Date(cycle.cycleStart.getTime() - 86_400_000),
   );
   const prevPayKey = toDateOnly(prevCycle.paymentDate);
 
   const today = nowBR();
-  // O ciclo vira a 00:00 do dia SEGUINTE ao dia de fronteira (03/18), que e'
-  // exatamente o cycleEnd — o dia de fronteira ainda pertence ao ciclo velho.
   const turnover = new Date(cycle.cycleEnd);
   turnover.setDate(turnover.getDate() + 1);
-  const daysToTurnover = Math.max(
-    0,
-    Math.ceil((turnover.getTime() - today.getTime()) / 86_400_000),
-  );
+  const daysToTurnover = Math.max(0, daysBetween(turnover, today));
+  // Dias ja' corridos do ciclo, contando hoje — a base de todo "ritmo" e de
+  // toda comparacao justa com o ciclo anterior.
+  const daysElapsed = Math.max(1, daysBetween(today, cycle.cycleStart) + 1);
 
   const isSent = (a: Album) =>
     a.status === "enviado" || a.status === "concluido";
   const mine = albums.filter((a) => a.responsible_id === profile.id);
 
-  // "Dono" (criador sem commission_rate) recebe o valor cheio do album,
-  // comissionado recebe o repasse fixo — mesma regra do /financial.
   const isOwner = isCriador && !isCommissioned(me);
   const earnFor = (a: Album) =>
     isOwner ? Number(a.value) : albumEarning(me, a.type, Number(a.value));
 
-  // Criador ve' a receita de TODA a equipe (RLS ja' devolve todos os albuns
-  // pra criador); admin/diagramador ve' so' os proprios — RLS ja' limita
-  // `albums` aos proprios registros nesse caso, entao scopeAlbums == mine.
   const scopeAlbums = isCriador ? albums : mine;
 
   // ------------------------------------------------------------- faturamento
@@ -151,21 +157,30 @@ export default async function DashboardPage() {
   );
   const cycleRevenue = cycleSent.reduce((s, a) => s + earnFor(a), 0);
   const prevRevenue = prevSent.reduce((s, a) => s + earnFor(a), 0);
-  const delta =
-    prevRevenue > 0 ? (cycleRevenue - prevRevenue) / prevRevenue : null;
 
-  // Meta pessoal e' sempre do PROPRIO usuario, mesmo pro criador (que pode
-  // ter --ou nao-- albuns proprios atribuidos) — nunca a receita da equipe,
-  // entao usa sempre `mine`, nunca `scopeAlbums`.
+  // Comparacao dia-a-dia, nao ciclo-cheio. No dia 2 de um ciclo de 15, medir
+  // 2 dias contra 15 rende sempre uma queda de ~85% que nao diz nada sobre
+  // desempenho — era o "-77,7%" que o card mostrava em todo inicio de ciclo.
+  // Aqui o ciclo anterior e' recortado na MESMA quantidade de dias corridos.
+  const prevSameWindow = prevSent.filter(
+    (a) => daysBetween(earnedAt(a), prevCycle.cycleStart) < daysElapsed,
+  );
+  const prevWindowRevenue = prevSameWindow.reduce(
+    (s, a) => s + earnFor(a),
+    0,
+  );
+  const delta =
+    prevWindowRevenue > 0
+      ? (cycleRevenue - prevWindowRevenue) / prevWindowRevenue
+      : null;
+
   const myCycleSent = mine.filter(
     (a) => isSent(a) && a.payment_date === payKey,
   );
   const myCycleRevenue = myCycleSent.reduce((s, a) => s + earnFor(a), 0);
 
   // --------------------------------------------------------- ciclo em aberto
-  // cycle_start e' o campo autoritativo de "a que ciclo este album pertence"
-  // (o cron carrega trabalho parado pro ciclo corrente, um salto por vez).
-  const inCycle = albums.filter(
+  const inCycle = scopeAlbums.filter(
     (a) => a.cycle_start === cycleStartKey && a.status !== "descartado",
   );
   const pending = inCycle.filter((a) =>
@@ -175,13 +190,23 @@ export default async function DashboardPage() {
     status: s,
     count: pending.filter((a) => a.status === s).length,
   })).filter((x) => x.count > 0);
+  const bottleneck = [...pendingByStatus].sort((a, b) => b.count - a.count)[0];
 
-  const flow = FLOW.map((f) => ({
+  const flow: FlowStep[] = FLOW.map((f) => ({
     ...f,
     label: ALBUM_STATUS_LABELS[f.status],
     count: inCycle.filter((a) => a.status === f.status).length,
   }));
-  const flowMax = Math.max(1, ...flow.map((f) => f.count));
+
+  // ------------------------------------------------------------------ ritmo
+  // Enviados por dia ate' agora contra quantos por dia seriam necessarios pra
+  // zerar a pendencia antes da virada. Os dois numeros juntos sao a unica
+  // leitura que diz se o ciclo fecha — nenhum dos dois sozinho diz.
+  const sentThisCycle = inCycle.filter(isSent).length;
+  const paceActual = sentThisCycle / daysElapsed;
+  const paceNeeded = daysToTurnover > 0 ? pending.length / daysToTurnover : 0;
+  const projected = Math.round(paceActual * daysToTurnover);
+  const carryOver = Math.max(0, pending.length - projected);
 
   const byType = (Object.keys(TYPE_TOKEN) as AlbumType[])
     .map((t) => {
@@ -191,7 +216,7 @@ export default async function DashboardPage() {
         label: ALBUM_TYPE_LABELS[t],
         token: TYPE_TOKEN[t],
         count: rows.length,
-        total: rows.reduce((s, a) => s + Number(a.value), 0),
+        total: rows.reduce((s, a) => s + earnFor(a), 0),
       };
     })
     .filter((t) => t.count > 0)
@@ -223,8 +248,6 @@ export default async function DashboardPage() {
     const points: RevenueSeries["points"] = [];
     const cursor = new Date(from);
     let acc = 0;
-    // Guarda de 400 iteracoes: se from/to vierem invertidos por algum dado
-    // estranho, o loop para em vez de travar a pagina.
     for (let i = 0; cursor <= to && i < 400; i++) {
       acc += byDay.get(toDateOnly(cursor)) ?? 0;
       points.push({
@@ -240,14 +263,7 @@ export default async function DashboardPage() {
       const lastDate = new Date(to);
       points[points.length - 1].label = shortDay(lastDate);
     }
-    return {
-      key,
-      tab,
-      period,
-      total: acc,
-      goal: goalValue,
-      points,
-    };
+    return { key, tab, period, total: acc, goal: goalValue, points };
   }
 
   const cycleTo = today < cycle.cycleEnd ? today : cycle.cycleEnd;
@@ -301,7 +317,7 @@ export default async function DashboardPage() {
       }[];
     }
   >();
-  for (const a of albums) {
+  for (const a of scopeAlbums) {
     if (!a.payment_date || !isSent(a)) continue;
     if (a.payment_date < toDateOnly(today)) continue;
     const cur = payments.get(a.payment_date) ?? {
@@ -309,7 +325,7 @@ export default async function DashboardPage() {
       count: 0,
       albums: [],
     };
-    cur.total += Number(a.value);
+    cur.total += earnFor(a);
     cur.count += 1;
     cur.albums.push({
       id: a.id,
@@ -317,7 +333,7 @@ export default async function DashboardPage() {
       class_code: a.class_code,
       type: a.type,
       status: a.status,
-      value: Number(a.value),
+      value: earnFor(a),
       responsibleName: userName.get(a.responsible_id) ?? "Desconhecido",
     });
     payments.set(a.payment_date, cur);
@@ -326,12 +342,17 @@ export default async function DashboardPage() {
     .map(([date, v]) => ({ date, ...v }))
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 4);
+  const nextPaymentsTotal = nextPayments.reduce((s, p) => s + p.total, 0);
 
   // ------------------------------------------------------------- problemas
-  const { count: openProblems } = await supabase
+  const openProblemsBase = supabase
     .from("album_problems")
     .select("album_id", { count: "exact", head: true })
     .eq("resolved", false);
+  const { count: openProblemsRaw } = await (isCriador
+    ? openProblemsBase
+    : openProblemsBase.in("album_id", mine.map((a) => a.id)));
+  const openProblems = openProblemsRaw ?? 0;
 
   // --------------------------------------------------- por diagramador
   const byUser = isCriador
@@ -348,20 +369,16 @@ export default async function DashboardPage() {
         .sort((a, b) => b.count - a.count)
     : [];
   const byUserMax = Math.max(1, ...byUser.map((u) => u.count));
+  const topUser = byUser[0];
+  const topUserShare =
+    topUser && inCycle.length > 0
+      ? Math.round((topUser.count / inCycle.length) * 100)
+      : 0;
 
-  // sentAll: todo o historico de envios (nao so' o ciclo atual), no escopo
-  // de quem esta' olhando — criador ve' o da equipe inteira, os demais so'
-  // o proprio (RLS ja' garante isso pra `albums`, `scopeAlbums` so' deixa
-  // explicito). Base dos tres widgets "historico" abaixo — nenhum deles
-  // deve se prender so' ao ciclo atual.
   const sentAll = scopeAlbums.filter(
     (a) => isSent(a) && a.payment_date,
   ) as unknown as CycleAlbum[];
 
-  // ---------------------------------------------- receita por diagramador
-  // Ganhos acumulados de CADA pessoa em toda a historia, nao so' o ciclo
-  // atual — separado do "Por diagramador" acima, que e' carga de trabalho
-  // (qualquer status, so' o ciclo aberto).
   const diagramadorEarnings = isCriador
     ? computeDiagramadorEarnings(sentAll, usersWithRate)
     : [];
@@ -371,10 +388,6 @@ export default async function DashboardPage() {
   );
 
   // -------------------------------------------------- tendencia de ciclos
-  // Todos os ciclos com pelo menos um album enviado, do mais antigo ao mais
-  // recente — nao so' os ultimos. Criador ve' receita bruta da organizacao
-  // (mesmo numero do /financial); diagramador/admin ve' so' os proprios
-  // ganhos, igual ao resto da pagina.
   const cycleSummaries = buildCycleSummaries(
     sentAll,
     usersWithRate,
@@ -388,19 +401,25 @@ export default async function DashboardPage() {
       : (s.byUser.find((u) => u.userId === profile.id)?.earnings ?? 0),
     isCurrent: s.paymentDate === payKey,
   }));
+  // Compara os dois ultimos ciclos JA' FECHADOS — incluir o corrente, que
+  // esta' pela metade, inverteria o sinal em todo comeco de quinzena.
+  const closed = trendPoints.filter((p) => !p.isCurrent);
+  const lastClosed = closed[closed.length - 1];
+  const beforeLast = closed[closed.length - 2];
+  const trendPct =
+    lastClosed && beforeLast && beforeLast.value > 0
+      ? Math.round(
+          ((lastClosed.value - beforeLast.value) / beforeLast.value) * 100,
+        )
+      : null;
 
   // ------------------------------------------- distribuicao por status
-  // Todo o historico (inclusive descartado/duplicado), nao so' o ciclo
-  // atual — "Fluxo de producao" acima ja' cobre o instantaneo do ciclo
-  // aberto, esta rosca responde "no total, como as coisas terminam".
   const statusCounts = new Map<AlbumStatus, number>();
   for (const a of scopeAlbums) {
     const s = a.status as AlbumStatus;
     statusCounts.set(s, (statusCounts.get(s) ?? 0) + 1);
   }
-  const statusDistribution: StatusSlice[] = Array.from(
-    statusCounts.entries(),
-  )
+  const statusDistribution: StatusSlice[] = Array.from(statusCounts.entries())
     .map(([status, value]) => ({
       key: status,
       label: ALBUM_STATUS_LABELS[status],
@@ -409,44 +428,65 @@ export default async function DashboardPage() {
     }))
     .sort((a, b) => b.value - a.value);
 
+  const problemShare =
+    scopeAlbums.length > 0
+      ? Math.round((openProblems / scopeAlbums.length) * 100)
+      : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Hero — a primeira linha responde "onde estou no ciclo" e a manchete
-          responde "o que falta". Antes o titulo era so' uma saudacao. */}
-      <div className="space-y-3">
-        <p className="glass-chip inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="space-y-10 pb-4">
+      {/* ------------------------------------------------------------ capa */}
+      <header className="animate-slide-up">
+        <p className="eyebrow flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground/60">
           <span
             className="h-1.5 w-1.5 rounded-full"
             style={{ background: "hsl(var(--success))" }}
             aria-hidden="true"
           />
-          Ciclo {cycle.label} · pagamento em {formatDate(cycle.paymentDate)}
+          <span>Ciclo {cycle.label}</span>
+          <span aria-hidden="true" className="text-muted-foreground/30">
+            ·
+          </span>
+          <span>Dia {daysElapsed} de {daysElapsed + daysToTurnover}</span>
+          <span aria-hidden="true" className="text-muted-foreground/30">
+            ·
+          </span>
+          <span>Pagamento em {formatDate(cycle.paymentDate)}</span>
+          <span aria-hidden="true" className="text-muted-foreground/30">
+            ·
+          </span>
+          <span>{isCriador ? "Equipe" : "Seus álbuns"}</span>
         </p>
-        <h1 className="font-display text-3xl font-semibold leading-[1.1] tracking-tight sm:text-[2.5rem]">
-          Olá, {firstName}.{" "}
+
+        <h1 className="mt-3 max-w-[22ch] font-display text-[2.1rem] font-semibold leading-[1.06] tracking-tight sm:text-[2.75rem]">
+           Olá, <span style={{ color: "hsl(var(--ink-amber))" }}> {firstName}.{" "}</span>
+        </h1>
+
+        {/* A leitura em prosa. E' o que o painel dizia so' em grafico: o
+            estado do ciclo, o ritmo, a projecao e onde esta' o acumulo. */}
+        <p className="mt-4 max-w-[68ch] text-[15px] leading-relaxed text-muted-foreground">
           {pending.length > 0 ? (
             <>
               Faltam{" "}
               <span style={{ color: "hsl(var(--ink-amber))" }}>
-                {pending.length} álbu{pending.length === 1 ? "m" : "ns"}
+                {plural(pending.length, "álbum", "álbuns")}
               </span>{" "}
               para fechar o ciclo.
             </>
           ) : (
-            <span className="text-muted-foreground">
-              Ciclo em dia — nada pendente de envio.
-            </span>
+            <>Ciclo em dia — nada pendente de envio.</>
           )}
-        </h1>
-      </div>
+        </p>
+      </header>
 
-      {/* KPIs — cada um leva pra tela que resolve o numero. */}
+      {/* ------------------------------------------------------------ KPIs */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title={isCriador ? "Faturamento da equipe" : "Seu faturamento"}
           value={formatBRL(cycleRevenue)}
           icon={Wallet}
           href="/financial"
+          spark={revenueSeries[0].points.map((p) => p.value)}
           trend={
             delta === null
               ? undefined
@@ -457,18 +497,16 @@ export default async function DashboardPage() {
           }
           description={
             delta === null
-              ? `${cycleSent.length} enviado${cycleSent.length === 1 ? "" : "s"} neste ciclo`
-              : `${cycleSent.length} enviado${cycleSent.length === 1 ? "" : "s"} · vs. ciclo anterior`
+              ? `${plural(cycleSent.length, "envio", "envios")} neste ciclo`
+              : `vs. mesmos ${daysElapsed}d do ciclo anterior`
+          }
+          footnote={
+            prevRevenue > 0
+              ? `${plural(cycleSent.length, "envio", "envios")} · ciclo anterior fechou em ${formatBRL(prevRevenue)}`
+              : `${plural(cycleSent.length, "envio", "envios")} no ciclo`
           }
         />
-        <StatCard
-          title="Próximo ciclo em"
-          value={daysToTurnover}
-          unit={daysToTurnover === 1 ? "dia" : "dias"}
-          accent="amber"
-          icon={CalendarClock}
-          description={`Vira ${shortDay(turnover)} · pagamento em ${formatDate(cycle.paymentDate)}`}
-        />
+
         <StatCard
           title="Faltam enviar"
           value={pending.length}
@@ -476,6 +514,11 @@ export default async function DashboardPage() {
           icon={Send}
           href="/fila"
           description={
+            daysToTurnover > 0
+              ? `${plural(daysToTurnover, "dia", "dias")} até a virada`
+              : "a virada é hoje"
+          }
+          footnote={
             pendingByStatus.length
               ? pendingByStatus
                   .map(
@@ -486,23 +529,81 @@ export default async function DashboardPage() {
               : "Nada pendente neste ciclo"
           }
         />
+
+        {/* Substituiu o antigo "Tipos no ciclo". Aquele card respondia
+            "quantos tipos diferentes existem" — um numero que fica em 1 por
+            meses e nao muda nenhuma decisao. */}
         <StatCard
-          title="Tipos no ciclo"
-          value={byType.length}
-          unit={byType.length === 1 ? "ativo" : "ativos"}
+          title="Ritmo necessário"
+          value={daysToTurnover > 0 ? Math.ceil(paceNeeded) : pending.length}
+          unit={daysToTurnover > 0 ? "por dia" : "hoje"}
           accent="amber"
-          icon={Layers}
-          href="/albums"
+          icon={Gauge}
+          href="/fila"
+          description={`${paceActual.toFixed(1)}/dia no ritmo atual`}
+          footnote={
+            daysToTurnover > 0
+              ? paceActual >= paceNeeded
+                ? "No ritmo atual o ciclo fecha zerado."
+                : `Faltam ${(paceNeeded - paceActual).toFixed(1)}/dia para zerar até ${shortDay(turnover)}.`
+              : `Tudo que não sair hoje atravessa para o ciclo seguinte.`
+          }
+        />
+
+        <StatCard
+          title="Problemas em aberto"
+          value={openProblems}
+          unit={openProblems === 1 ? "álbum" : "álbuns"}
+          accent="amber"
+          icon={ShieldAlert}
+          href="/albums?problems=yes"
           description={
-            byType.length
-              ? byType.map((t) => `${t.label} ${t.count}`).join(" · ")
-              : "Nenhum álbum neste ciclo"
+            openProblems > 0 ? `${problemShare}% da base` : "nada pendente"
+          }
+          footnote={
+            openProblems > 0
+              ? "Fotos insuficientes, duplicados e erros de download ainda sem resolução."
+              : "Nenhum álbum com problema registrado."
           }
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        <div className="space-y-4">
+      {/* -------------------------------------------------- 01 faturamento */}
+      <section aria-labelledby="sec-faturamento">
+        <SectionHeader
+          index="01"
+          kicker="Faturamento"
+          headline={
+            <span id="sec-faturamento">
+              {cycleRevenue > 0 ? (
+                <>
+                  {formatBRL(cycleRevenue)} garantidos nos primeiros{" "}
+                  {plural(daysElapsed, "dia", "dias")} do ciclo.
+                </>
+              ) : (
+                <>Nenhum envio entrou no caixa deste ciclo ainda.</>
+              )}
+            </span>
+          }
+          lede={
+            delta !== null ? (
+              <>
+                A comparação é com os <strong>mesmos {daysElapsed} dias</strong>{" "}
+                do ciclo anterior ({formatBRL(prevWindowRevenue)}), não com o
+                ciclo fechado — medir dois dias contra quinze produziria uma
+                queda que só reflete o calendário.
+              </>
+            ) : (
+              <>
+                O ciclo anterior não teve envios nesta mesma janela de dias, então
+                não há base de comparação — a curva abaixo mostra o acumulado
+                bruto.
+              </>
+            )
+          }
+        />
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <RevenueAreaChart
             series={revenueSeries}
             description={
@@ -517,292 +618,324 @@ export default async function DashboardPage() {
             }
           />
 
-          <CycleTrendChart
-            points={trendPoints}
-            description={
-              isCriador
-                ? "Receita bruta da organização em todos os ciclos, do mais antigo ao atual."
-                : "Seus ganhos em todos os ciclos, do mais antigo ao atual."
-            }
-          />
-
-          {/* Fluxo de producao — barras horizontais, na ordem do fluxo. */}
-          <section className="glass p-5">
-            <h2 className="text-base font-semibold tracking-tight">
-              Fluxo de produção
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Os {inCycle.length} álbu{inCycle.length === 1 ? "m" : "ns"} cujo
-              ciclo de início é o atual.
-            </p>
-            <div className="mt-4 space-y-2.5">
-              {flow.map((f) => (
-                <BarRow
-                  key={f.status}
-                  label={f.label}
-                  value={f.count}
-                  ratio={f.count / flowMax}
-                  token={f.token}
-                  right={String(f.count)}
-                />
-              ))}
-            </div>
-          </section>
-
-          {isCriador && byUser.length > 0 && (
-            <section className="glass p-5">
-              <h2 className="text-base font-semibold tracking-tight">
-                Por diagramador
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Álbuns do ciclo atual por responsável.
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            {/* Meta pessoal */}
+            <section className="glass relative overflow-hidden p-5">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-16 -right-12 h-44 w-44 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(closest-side, hsl(var(--brand-amber) / 0.2), transparent)",
+                }}
+              />
+              <h3 className="relative text-base font-semibold tracking-tight">
+                Meta pessoal
+              </h3>
+              <p className="relative mt-1 text-sm text-muted-foreground">
+                Valor a receber no fechamento
               </p>
-              <div className="mt-4 space-y-2.5">
-                {byUser.map((u) => (
-                  <BarRow
-                    key={u.name}
-                    label={u.name}
-                    value={u.count}
-                    ratio={u.count / byUserMax}
-                    token="--brand-blue"
-                    right={String(u.count)}
+
+              {goalValue ? (
+                <>
+                  <p className="relative mt-4 flex items-baseline gap-2 font-display text-[1.9rem] font-semibold leading-none tracking-tight tabular-nums">
+                    {formatBRL(myCycleRevenue)}
+                    <span className="text-sm font-medium text-muted-foreground">
+                      de {formatBRL(goalValue)}
+                    </span>
+                  </p>
+                  <div className="progress-track relative mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--chip)]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(goalPct ?? 0) * 100}%`,
+                        background:
+                          "linear-gradient(90deg, hsl(var(--brand-blue)), hsl(var(--brand-amber)))",
+                      }}
+                    />
+                  </div>
+                  <p className="relative mt-2.5 text-xs text-muted-foreground">
+                    {Math.round((goalPct ?? 0) * 100)}%
+                    {goalMissing && goalMissing > 0
+                      ? ` · faltam ${formatBRL(goalMissing)}`
+                      : " · meta batida"}
+                  </p>
+                </>
+              ) : (
+                <Link
+                  href="/metas"
+                  className="focus-ring relative mt-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-[hsl(var(--ink-blue))] hover:underline"
+                >
+                  Definir uma meta
+                  <ArrowRight className="h-3.5 w-3.5" weight="regular" />
+                </Link>
+              )}
+            </section>
+
+            {/* Proximos pagamentos */}
+            <section className="glass p-5">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-base font-semibold tracking-tight">
+                  Próximos pagamentos
+                </h3>
+                {nextPaymentsTotal > 0 && (
+                  <span className="font-display text-sm font-semibold tabular-nums">
+                    {formatBRL(nextPaymentsTotal)}
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 space-y-2">
+                {nextPayments.length === 0 && (
+                  <EmptyState
+                    icon={CalendarClock}
+                    title="Nenhum pagamento previsto"
+                    description="Álbuns marcados como enviados aparecem aqui com a data de pagamento."
+                    className="border-0 py-6 shadow-none"
                   />
+                )}
+                {nextPayments.map((p, i) => (
+                  <div
+                    key={p.date}
+                    className="glass-chip flex items-center justify-between rounded-xl px-3.5 py-2.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{
+                          background:
+                            i === 0
+                              ? "hsl(var(--brand-blue))"
+                              : "hsl(var(--brand-amber))",
+                        }}
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="text-sm font-medium">
+                          {formatDate(p.date)}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {plural(p.count, "álbum", "álbuns")}
+                          <PaymentAlbumsButton
+                            date={p.date}
+                            total={p.total}
+                            count={p.count}
+                            albums={p.albums}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="font-display text-base font-semibold tabular-nums">
+                      {formatBRL(p.total)}
+                    </div>
+                  </div>
                 ))}
               </div>
             </section>
-          )}
-
-          {/* Receita, nao so' contagem: complementa "Por diagramador" acima
-              mostrando quanto cada um ja' ganhou no total — nao so' o ciclo
-              atual, todo o historico de envios. */}
-          {isCriador && diagramadorEarnings.length > 0 && (
-            <section className="glass p-5">
-              <h2 className="text-base font-semibold tracking-tight">
-                Receita por diagramador
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Comissão acumulada em todo o histórico.
-              </p>
-              <div className="mt-4 space-y-2.5">
-                {diagramadorEarnings.map((u) => (
-                  <BarRow
-                    key={u.userId}
-                    label={u.name}
-                    value={u.earnings}
-                    ratio={u.earnings / diagramadorEarningsMax}
-                    token="--brand-amber"
-                    right={`${u.count} · ${formatBRL(u.earnings)}`}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          </div>
         </div>
+      </section>
 
-        <div className="space-y-4">
-          {/* Tipos de album — conta e valor lado a lado: sem o valor, "14
-              colabs" e "9 especiais" parecem equivalentes, e nao sao. */}
+      {/* ----------------------------------------------------- 02 producao */}
+      <section aria-labelledby="sec-producao">
+        <SectionHeader
+          index="02"
+          kicker="Produção"
+          headline={
+            <span id="sec-producao">
+              {bottleneck ? (
+                <>
+                  O funil trava em{" "}
+                  {ALBUM_STATUS_LABELS[bottleneck.status].toLowerCase()}:{" "}
+                  {plural(bottleneck.count, "álbum parado", "álbuns parados")}.
+                </>
+              ) : (
+                <>Nada parado no funil deste ciclo.</>
+              )}
+            </span>
+          }
+          lede={
+            <>
+              As cinco etapas dos {plural(inCycle.length, "álbum", "álbuns")}{" "}
+              cujo ciclo de início é o atual. A porcentagem sob cada etapa é
+              quanto do passo anterior já chegou nela — é onde a fila deixa de
+              andar.
+            </>
+          }
+          right={
+            openProblems > 0 ? (
+              <Link
+                href="/albums?problems=yes"
+                className="glass-chip glass-interactive focus-ring inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium"
+              >
+                <AlertTriangle
+                  className="h-4 w-4 text-[hsl(var(--status-problem))]"
+                  weight="duotone"
+                  aria-hidden="true"
+                />
+                {plural(openProblems, "problema", "problemas")} em aberto
+                <ArrowRight className="h-3.5 w-3.5" weight="regular" />
+              </Link>
+            ) : null
+          }
+        />
+
+        <FlowFunnel steps={flow} />
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <section className="glass p-5">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-semibold tracking-tight">
+              <h3 className="text-base font-semibold tracking-tight">
                 Tipos de álbum
-              </h2>
-              <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Ciclo
-              </span>
+              </h3>
+              <span className="eyebrow text-muted-foreground">Ciclo atual</span>
             </div>
-            <div className="mt-4 space-y-2.5">
+            <p className="mt-1 text-sm text-muted-foreground">
+              Contagem e valor bruto lado a lado — sem o valor, “14 colabs” e
+              “9 especiais” parecem equivalentes.
+            </p>
+            <MetricList className="mt-3">
               {byType.length === 0 && (
-                <p className="py-4 text-center text-xs text-muted-foreground">
+                <p className="py-6 text-center text-xs text-muted-foreground">
                   Nenhum álbum neste ciclo ainda.
                 </p>
               )}
               {byType.map((t) => (
-                <BarRow
+                <MetricRow
                   key={t.type}
                   label={t.label}
-                  value={t.total}
-                  ratio={t.total / typeMax}
                   token={t.token}
-                  right={`${t.count} · ${formatBRL(t.total)}`}
+                  ratio={t.total / typeMax}
+                  note={`${t.count} álb.`}
+                  value={formatBRL(t.total)}
                 />
               ))}
-            </div>
+            </MetricList>
           </section>
 
           <StatusDonutChart
             data={statusDistribution}
-            description={`Todo o histórico: ${scopeAlbums.length} álbu${scopeAlbums.length === 1 ? "m" : "ns"}, incluindo o ciclo atual.`}
+            description={`Todo o histórico: ${plural(scopeAlbums.length, "álbum", "álbuns")}, incluindo o ciclo atual.`}
+          />
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------- 03 equipe */}
+      {isCriador && byUser.length > 0 && (
+        <section aria-labelledby="sec-equipe">
+          <SectionHeader
+            index="03"
+            kicker="Equipe"
+            headline={
+              <span id="sec-equipe">
+                {topUser ? (
+                  <>
+                    {topUser.name.split(" ")[0]} carrega {topUserShare}% da fila
+                    do ciclo.
+                  </>
+                ) : (
+                  <>Nenhum álbum atribuído neste ciclo.</>
+                )}
+              </span>
+            }
+            lede={
+              <>
+                À esquerda, carga de trabalho do ciclo aberto (qualquer status).
+                À direita, comissão acumulada em todo o histórico de envios — são
+                recortes diferentes de propósito: quem tem mais fila agora não é
+                necessariamente quem mais recebeu.
+              </>
+            }
           />
 
-          {/* Meta pessoal */}
-          <section className="glass relative overflow-hidden p-5">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-16 -right-12 h-44 w-44 rounded-full"
-              style={{
-                background:
-                  "radial-gradient(closest-side, hsl(var(--brand-amber) / 0.2), transparent)",
-              }}
-            />
-            <h2 className="relative text-base font-semibold tracking-tight">
-              Meta pessoal
-            </h2>
-            <p className="relative mt-1 text-sm text-muted-foreground">
-              Valor a receber no fechamento
-            </p>
-
-            {goalValue ? (
-              <>
-                <p className="relative mt-4 flex items-baseline gap-2 font-display text-[1.9rem] font-semibold leading-none tracking-tight tabular-nums">
-                  {formatBRL(myCycleRevenue)}
-                  <span className="text-sm font-medium text-muted-foreground">
-                    de {formatBRL(goalValue)}
-                  </span>
-                </p>
-                <div className="progress-track relative mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--chip)]">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(goalPct ?? 0) * 100}%`,
-                      background:
-                        "linear-gradient(90deg, hsl(var(--brand-blue)), hsl(var(--brand-amber)))",
-                    }}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section className="glass p-5">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-base font-semibold tracking-tight">
+                  Carga do ciclo
+                </h3>
+                <span className="eyebrow text-muted-foreground">
+                  {plural(inCycle.length, "álbum", "álbuns")}
+                </span>
+              </div>
+              <MetricList className="mt-3">
+                {byUser.map((u) => (
+                  <MetricRow
+                    key={u.name}
+                    label={u.name}
+                    ratio={u.count / byUserMax}
+                    token="--brand-blue"
+                    note={`${Math.round((u.count / Math.max(1, inCycle.length)) * 100)}%`}
+                    value={String(u.count)}
                   />
-                </div>
-                <p className="relative mt-2.5 text-xs text-muted-foreground">
-                  {Math.round((goalPct ?? 0) * 100)}%
-                  {goalMissing && goalMissing > 0
-                    ? ` · faltam ${formatBRL(goalMissing)}`
-                    : " · meta batida"}
-                </p>
-              </>
-            ) : (
-              <Link
-                href="/metas"
-                className="relative mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--ink-blue))] hover:underline"
-              >
-                Definir uma meta
-                <ArrowRight className="h-3.5 w-3.5" weight="regular" />
-              </Link>
-            )}
-          </section>
+                ))}
+              </MetricList>
+            </section>
 
-          {/* Proximos pagamentos */}
-          <section className="glass p-5">
-            <h2 className="text-base font-semibold tracking-tight">
-              Próximos pagamentos
-            </h2>
-            <div className="mt-4 space-y-2">
-              {nextPayments.length === 0 && (
-                <EmptyState
-                  icon={CalendarClock}
-                  title="Nenhum pagamento previsto"
-                  description="Álbuns marcados como enviados aparecem aqui com a data de pagamento."
-                  className="border-0 py-6 shadow-none"
-                />
-              )}
-              {nextPayments.map((p, i) => (
-                <div
-                  key={p.date}
-                  className="glass-chip flex items-center justify-between rounded-xl px-3.5 py-2.5"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{
-                        background:
-                          i === 0
-                            ? "hsl(var(--brand-blue))"
-                            : "hsl(var(--brand-amber))",
-                      }}
-                      aria-hidden="true"
+            {diagramadorEarnings.length > 0 && (
+              <section className="glass p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-base font-semibold tracking-tight">
+                    Comissão acumulada
+                  </h3>
+                  <span className="eyebrow text-muted-foreground">
+                    Histórico
+                  </span>
+                </div>
+                <MetricList className="mt-3">
+                  {diagramadorEarnings.map((u) => (
+                    <MetricRow
+                      key={u.userId}
+                      label={u.name}
+                      ratio={u.earnings / diagramadorEarningsMax}
+                      token="--brand-amber"
+                      note={`${u.count} álb.`}
+                      value={formatBRL(u.earnings)}
                     />
-                    <div>
-                      <div className="text-sm font-medium">
-                        {formatDate(p.date)}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {p.count} álbu{p.count === 1 ? "m" : "ns"}
-                        <PaymentAlbumsButton
-                          date={p.date}
-                          total={p.total}
-                          count={p.count}
-                          albums={p.albums}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="font-display text-base font-semibold tabular-nums">
-                    {formatBRL(p.total)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                  ))}
+                </MetricList>
+              </section>
+            )}
+          </div>
+        </section>
+      )}
 
-          {(openProblems ?? 0) > 0 && (
-            <Link
-              href="/albums"
-              className="glass relative block overflow-hidden p-5 text-white transition-transform hover:-translate-y-0.5"
-              style={{
-                background:
-                  "linear-gradient(135deg, hsl(25 90% 52%), hsl(38 92% 50%))",
-                borderColor: "hsl(25 90% 40% / 0.5)",
-              }}
-            >
-              <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/80">
-                Problemas em aberto
-              </p>
-              <p className="mt-2 flex items-center gap-2 font-display text-[1.75rem] font-semibold leading-none tabular-nums">
-                <AlertTriangle className="h-5 w-5" weight="bold" />
-                {openProblems}
-              </p>
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-white/85">
-                Ver os álbuns afetados
-                <ArrowRight className="h-3.5 w-3.5" weight="regular" />
-              </p>
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Linha de barra horizontal. Rotulo em cima, valor a' direita, trilho com o
- * sulco interno (.progress-track) pra barra parecer embutida no vidro.
- */
-function BarRow({
-  label,
-  ratio,
-  token,
-  right,
-}: {
-  label: string;
-  value: number;
-  ratio: number;
-  token: string;
-  right: string;
-}) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="truncate text-foreground/80">{label}</span>
-        <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
-          {right}
-        </span>
-      </div>
-      <div className="progress-track mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[var(--chip)]">
-        <div
-          className="h-full rounded-full transition-[width] duration-500"
-          style={{
-            width: `${Math.max(2, ratio * 100)}%`,
-            background: `hsl(var(${token}))`,
-          }}
+      {/* ---------------------------------------------------- 04 historico */}
+      <section aria-labelledby="sec-historico">
+        <SectionHeader
+          index={isCriador && byUser.length > 0 ? "04" : "03"}
+          kicker="Histórico"
+          headline={
+            <span id="sec-historico">
+              {trendPct === null ? (
+                <>Ainda não há dois ciclos fechados para comparar.</>
+              ) : trendPct >= 0 ? (
+                <>
+                  O último ciclo fechado subiu {trendPct}% sobre o anterior.
+                </>
+              ) : (
+                <>
+                  O último ciclo fechado caiu {Math.abs(trendPct)}% sobre o
+                  anterior.
+                </>
+              )}
+            </span>
+          }
+          lede={
+            isCriador
+              ? "Receita bruta da organização em cada ciclo de pagamento, do mais antigo ao atual. A última barra é o ciclo aberto e ainda vai crescer."
+              : "Seus ganhos em cada ciclo de pagamento, do mais antigo ao atual. A última barra é o ciclo aberto e ainda vai crescer."
+          }
         />
-      </div>
+
+        <CycleTrendChart
+          points={trendPoints}
+          description={
+            isCriador
+              ? "Receita bruta da organização em todos os ciclos, do mais antigo ao atual."
+              : "Seus ganhos em todos os ciclos, do mais antigo ao atual."
+          }
+        />
+      </section>
     </div>
   );
 }

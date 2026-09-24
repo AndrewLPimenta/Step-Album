@@ -1,15 +1,28 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { AppIcon } from "@/lib/icons";
+import { Sparkline } from "@/components/dashboard/sparkline";
 
 interface StatCardProps {
   title: string;
   value: string | number;
   /** Sufixo do numero ("dias", "álbuns", "ativos") — some ao lado, menor. */
   unit?: string;
+  /** Linha logo abaixo do numero, ao lado da variacao. */
   description?: string;
   icon?: AppIcon;
   trend?: { value: string; positive?: boolean };
+  /**
+   * Serie da micro-curva no rodape do card. Dois pontos ja' bastam; abaixo
+   * disso o componente nao desenha nada em vez de desenhar uma reta que
+   * sugere tendencia que nao existe.
+   */
+  spark?: number[];
+  /**
+   * Nota de rodape, separada por um fio — o detalhe que explica o numero sem
+   * disputar espaco com ele ("123 baixado · 83 editando").
+   */
+  footnote?: string;
   /**
    * Tinta do rotulo e do halo. Alterne entre os dois numa fileira de KPIs
    * pra dar ritmo — nao ha significado semantico atrelado.
@@ -31,6 +44,8 @@ export function StatCard({
   description,
   icon: Icon,
   trend,
+  spark,
+  footnote,
   accent = "blue",
   href,
   className,
@@ -50,15 +65,12 @@ export function StatCard({
         aria-hidden="true"
         className="pointer-events-none absolute -right-10 -top-14 h-36 w-36 rounded-full"
         style={{
-          background: `radial-gradient(closest-side, hsl(${tint} / 0.22), transparent)`,
+          background: `radial-gradient(closest-side, hsl(${tint} / 0.2), transparent)`,
         }}
       />
 
       <div className="relative flex items-start justify-between gap-3">
-        <p
-          className="text-[9.5px] font-semibold uppercase tracking-[0.14em]"
-          style={{ color: `hsl(${ink})` }}
-        >
+        <p className="eyebrow" style={{ color: `hsl(${ink})` }}>
           {title}
         </p>
         {Icon && (
@@ -84,14 +96,37 @@ export function StatCard({
           {trend && (
             <span
               className={cn(
-                "font-medium tabular-nums",
+                "inline-flex items-center gap-0.5 font-medium tabular-nums",
                 trend.positive ? "text-success" : "text-destructive",
               )}
             >
+              {/* Seta junto do sinal: variacao lida so' por cor some pra quem
+                  nao distingue vermelho de verde (WCAG 1.4.1). */}
+              <span aria-hidden="true">{trend.positive ? "↗" : "↘"}</span>
               {trend.value}
             </span>
           )}
           {description}
+        </p>
+      )}
+
+      {spark && spark.length > 1 && (
+        <Sparkline
+          values={spark}
+          stroke={`hsl(${tint})`}
+          label={`Tendência de ${title.toLowerCase()}`}
+          className="relative mt-4 h-7 w-full"
+        />
+      )}
+
+      {footnote && (
+        <p
+          className={cn(
+            "relative border-t border-[var(--brd)] pt-2.5 text-xs text-muted-foreground",
+            spark && spark.length > 1 ? "mt-3" : "mt-4",
+          )}
+        >
+          {footnote}
         </p>
       )}
     </>
@@ -100,8 +135,8 @@ export function StatCard({
   const shell = cn(
     // .glass traz raio, borda, sombra e backdrop-filter (globals.css).
     // overflow-hidden e' o que segura o halo dentro do canto arredondado.
-    "glass relative block overflow-hidden p-5 transition-transform duration-200",
-    href ? "hover:-translate-y-0.5 focus-visible:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : "hover:-translate-y-0.5",
+    "glass glass-interactive relative flex flex-col overflow-hidden p-5",
+    href && "focus-ring block",
     className,
   );
 

@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getAlbumById, listDiagramadores } from "@/lib/queries";
+import { getAlbumById, listDiagramadores, albumEarning, isCommissioned } from "@/lib/queries";
+import type { UserWithRate } from "@/lib/queries";
 import { AlbumForm } from "@/components/albums/album-form";
 import { ProblemsPanel } from "@/components/albums/problems-panel";
 import { StatusBadge } from "@/components/albums/status-badge";
@@ -30,6 +31,11 @@ export default async function AlbumDetailPage({
   const { album, problems, responsible } = result;
   const diagramadores = await listDiagramadores();
   const isAdmin = profile.role === "criador";
+  const me = profile as UserWithRate;
+  const isOwner = isAdmin && !isCommissioned(me);
+  const displayValue = isOwner
+    ? Number(album.value)
+    : albumEarning(me, album.type, Number(album.value));
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -64,7 +70,7 @@ export default async function AlbumDetailPage({
         <InfoCard
           icon={<Wallet className="h-4 w-4" />}
           label="Valor"
-          value={formatBRL(album.value)}
+          value={formatBRL(displayValue)}
           sub="definido pelo tipo"
         />
         <InfoCard

@@ -411,3 +411,183 @@
   }
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
 }
+
+/* ===========================================================================
+   Camada 2 do liquid glass — profundidade, luz e textura.
+
+   A camada original (acima) resolveu a MATERIA: uma superficie translucida
+   com blur e uma aurora atras pra ela ter o que borrar. O que faltava era o
+   que separa vidro de "retangulo com opacidade":
+
+   1. Elevacao. Tudo usava a mesma .glass — card de KPI, painel de grafico e
+      dialogo flutuavam na mesma altura, entao nada parecia estar na frente
+      de nada. Agora sao tres degraus (sunken / glass / raised).
+   2. Luz especular. Vidro de verdade tem uma aresta clara na borda de cima,
+      onde a luz entra, e escurece na de baixo. Uma borda de 1px uniforme e'
+      justamente o que entrega superficie chapada.
+   3. Grao. Gradiente grande em 8 bits faz banding — aquelas faixas visiveis
+      na aurora. Um ruido de ~3% quebra a faixa e da' a textura de vidro
+      jateado em vez de degrade de banco de imagem.
+   =========================================================================== */
+
+@layer components {
+  /* Aresta especular. Pseudo-elemento em vez de border-image porque a borda
+     real (1px de --brd) continua existindo por baixo: esta so' acrescenta a
+     variacao de luz de cima pra baixo. inherit no raio pra acompanhar
+     qualquer rounded-* que o componente tenha passado por className. */
+  .glass,
+  .glass-raised {
+    position: relative;
+    isolation: isolate;
+  }
+  .glass::before,
+  .glass-raised::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      160deg,
+      hsl(0 0% 100% / 0.85) 0%,
+      hsl(0 0% 100% / 0.22) 26%,
+      transparent 58%,
+      hsl(240 30% 30% / 0.07) 100%
+    );
+    /* mask composite recorta o preenchimento e deixa so' a moldura de 1px —
+       e' o unico jeito de ter gradiente numa borda sem duplicar elemento. */
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .dark .glass::before,
+  .dark .glass-raised::before {
+    background: linear-gradient(
+      160deg,
+      hsl(0 0% 100% / 0.16) 0%,
+      hsl(0 0% 100% / 0.05) 30%,
+      transparent 60%,
+      hsl(0 0% 0% / 0.2) 100%
+    );
+  }
+
+  /* Degrau acima do padrao: dialogo, popover, menu, command palette. Blur e
+     sombra maiores porque ele precisa se descolar de um .glass que ja' esta'
+     na tela — nao do fundo. */
+  .glass-raised {
+    border-radius: 22px;
+    background: var(--glass-raised);
+    border: 1px solid var(--brd);
+    box-shadow: var(--sh-raised), var(--inset);
+    backdrop-filter: blur(40px) saturate(190%);
+    -webkit-backdrop-filter: blur(40px) saturate(190%);
+  }
+
+  /* Degrau abaixo: lista/tabela dentro de um card, trilho de barra, poco de
+     conteudo. Nao e' vidro proprio — e' uma reentrancia no vidro de cima. */
+  .glass-sunken {
+    background: var(--sunken);
+    box-shadow: var(--sunken-inset);
+  }
+
+  /* Grao. Fica na aurora (nao no body) pra herdar o mesmo fixed/altura e
+     nunca aparecer por cima do conteudo. feTurbulence gera o ruido no
+     proprio navegador — sem requisicao de imagem. */
+  .aurora::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.4;
+    mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+  .dark .aurora::after {
+    opacity: 0.22;
+  }
+
+  /* Rotulo de secao. O par 9.5px/uppercase/tracking .14em estava repetido em
+     linha em uma duzia de arquivos; qualquer ajuste de tipografia exigia
+     achar todos. */
+  .eyebrow {
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  /* Superficie clicavel de vidro: card de KPI com href, chip de atalho.
+     Sobe 2px e ganha luz na borda — nao muda de cor, porque tingir vidro no
+     hover e' o que faz parecer botao pintado. */
+  .glass-interactive {
+    transition:
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .glass-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sh-raised), var(--inset);
+  }
+  .glass-interactive:active {
+    transform: translateY(0);
+    transition-duration: 80ms;
+  }
+
+  /* Anel de foco unico do app. Dois aneis (um claro por dentro) pra o
+     indicador sobreviver tanto sobre vidro claro quanto sobre a pilula azul
+     — um anel solto de 2px some em cima do gradiente da nav. */
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring));
+  }
+}
+
+@layer base {
+  :root {
+    --glass-raised: hsl(0 0% 100% / 0.72);
+    --sh-raised: 0 32px 64px -28px hsl(240 30% 25% / 0.55);
+    --sunken: hsl(240 20% 92% / 0.38);
+    --sunken-inset: inset 0 1px 2px hsl(240 30% 25% / 0.1);
+  }
+  .dark {
+    --glass-raised: hsl(240 8% 14% / 0.82);
+    --sh-raised: 0 34px 68px -26px hsl(240 40% 2% / 0.9);
+    --sunken: hsl(240 12% 4% / 0.4);
+    --sunken-inset: inset 0 1px 2px hsl(240 40% 2% / 0.55);
+  }
+
+  /* Acessibilidade: nada aqui e' animacao essencial — as transicoes so'
+     suavizam mudancas de estado. Quem pede menos movimento no sistema
+     recebe as mesmas telas, sem o deslocamento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .glass-interactive:hover {
+      transform: none;
+    }
+  }
+
+  /* Alvo de foco visivel por padrao em tudo que e' focavel. O default do
+     navegador sumia sobre vidro em varios pontos (contraste do outline
+     preto contra fundo borrado claro). */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}

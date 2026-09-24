@@ -55,6 +55,7 @@ export {
   File,
   Image as FileImage,
   FolderOpen,
+  Gauge,
   HardDrives as HardDriveDownload,
   ImageBroken as ImageOff,
   Stack as Layers,

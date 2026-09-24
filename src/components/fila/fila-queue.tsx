@@ -59,6 +59,7 @@ const NEXT_STATUS: Partial<Record<AlbumStatus, AlbumStatus>> = {
 
 const TYPE_FILTER_ALL = "todos";
 const RESPONSIBLE_FILTER_ALL = "todos";
+const STATUS_FILTER_ALL = "todos";
 
 export interface FilaAlbum {
   id: string;
@@ -89,6 +90,7 @@ export function FilaQueue({ albums, users }: Props) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>(TYPE_FILTER_ALL);
   const [responsibleFilter, setResponsibleFilter] = useState<string>(RESPONSIBLE_FILTER_ALL);
+  const [statusFilter, setStatusFilter] = useState<string>(STATUS_FILTER_ALL);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -147,6 +149,7 @@ export function FilaQueue({ albums, users }: Props) {
     return optimisticAlbums.filter((a) => {
       if (typeFilter !== TYPE_FILTER_ALL && a.type !== typeFilter) return false;
       if (responsibleFilter !== RESPONSIBLE_FILTER_ALL && a.responsible_id !== responsibleFilter) return false;
+      if (statusFilter !== STATUS_FILTER_ALL && a.status !== statusFilter) return false;
       if (!q) return true;
       return (
         a.student_name.toLowerCase().includes(q) ||
@@ -155,7 +158,7 @@ export function FilaQueue({ albums, users }: Props) {
         (a.student_code ?? "").includes(q)
       );
     });
-  }, [optimisticAlbums, search, typeFilter, responsibleFilter]);
+  }, [optimisticAlbums, search, typeFilter, responsibleFilter, statusFilter]);
 
   // Selection shouldn't survive items scrolling out of the current filter —
   // otherwise a bulk action can silently act on albums you're not looking at.
@@ -289,16 +292,20 @@ export function FilaQueue({ albums, users }: Props) {
       return;
     }
 
-    // Open synchronously via hidden <a> — avoids popup blocker
+    // Hidden iframes — avoids popup blocker entirely.
+    // <a target="_blank"> only lets the FIRST tab through; all others are blocked.
+    // An iframe with a download URL silently triggers the browser download manager
+    // without opening new tabs and without popup-blocker interference.
     toDownload.forEach((kazId) => {
       const numericId = kazId.replace(/^row_/, "");
-      const link = document.createElement("a");
-      link.href = KAZ_DOWNLOAD_URL(numericId);
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = KAZ_DOWNLOAD_URL(numericId);
+      document.body.appendChild(iframe);
+      // Remove after a generous window so the request can complete
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      }, 60_000);
     });
 
     const msg = missing > 0
@@ -373,13 +380,28 @@ export function FilaQueue({ albums, users }: Props) {
           </SelectContent>
         </Select>
 
-        {(typeFilter !== TYPE_FILTER_ALL || responsibleFilter !== RESPONSIBLE_FILTER_ALL) && (
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={STATUS_FILTER_ALL}>Todos os status</SelectItem>
+            {ACTIVE_STATUSES.map((st) => (
+              <SelectItem key={st} value={st}>
+                {ALBUM_STATUS_LABELS[st]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(typeFilter !== TYPE_FILTER_ALL || responsibleFilter !== RESPONSIBLE_FILTER_ALL || statusFilter !== STATUS_FILTER_ALL) && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
               setTypeFilter(TYPE_FILTER_ALL);
               setResponsibleFilter(RESPONSIBLE_FILTER_ALL);
+              setStatusFilter(STATUS_FILTER_ALL);
             }}
           >
             <X className="h-3.5 w-3.5 mr-1" />

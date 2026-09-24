@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Download, LogOut, PanelLeft, PanelLeftClose, Search } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,9 +15,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import {
+  openCommandPalette,
+  useCommandKeyLabel,
+} from "@/components/layout/command-palette";
 import { signOutAction } from "@/server/actions/auth";
 import { initials } from "@/lib/utils";
-import { navLabelForPathname, USER_ROLE_LABELS } from "@/lib/constants";
+import {
+  NAV_GROUP_LABELS,
+  navGroupForPathname,
+  navLabelForPathname,
+  USER_ROLE_LABELS,
+} from "@/lib/constants";
 import type { UserRole } from "@/types/database";
 
 interface HeaderProps {
@@ -38,14 +48,14 @@ export function Header({
   onToggleSidebar,
 }: HeaderProps) {
   const [isPending, startTransition] = useTransition();
-  const [term, setTerm] = useState("");
   const pathname = usePathname();
-  const router = useRouter();
+  const cmdKey = useCommandKeyLabel();
 
   // Deriva do NAV_ITEMS. O mapa antigo tinha 7 entradas para 10 destinos, e
   // /sprint, /transferencias e /app ficavam sem titulo — justamente as telas
   // em que, no mobile, nao ha sidebar mostrando onde voce esta.
   const pageLabel = navLabelForPathname(pathname);
+  const group = navGroupForPathname(pathname);
 
   return (
     // Barra flutuante em vez de colada no topo: a mesma materia dos cards,
@@ -69,43 +79,67 @@ export function Header({
       </Button>
 
       {/* Trilha em vez de titulo solto: diz onde voce esta dentro do painel,
-          nao so' o nome da tela. */}
+          nao so' o nome da tela. O nivel do meio e' o grupo do proprio
+          NAV_ITEMS ("Operação", "Acompanhamento"...) — "Workspace" fixo nao
+          dizia nada que a tela ja' nao dissesse. */}
       <nav aria-label="Trilha" className="min-w-0 truncate text-sm">
-        <span className="hidden text-muted-foreground/70 sm:inline">
-          Workspace
-        </span>
-        <span className="hidden px-1.5 text-muted-foreground/40 sm:inline">
-          /
-        </span>
+        <Link
+          href="/dashboard"
+          className="hidden rounded text-muted-foreground/70 transition-colors hover:text-foreground sm:inline"
+        >
+          StepAlbum
+        </Link>
+        {group && (
+          <>
+            <span className="hidden px-1.5 text-muted-foreground/40 sm:inline">
+              /
+            </span>
+            <span className="hidden text-muted-foreground/70 lg:inline">
+              {NAV_GROUP_LABELS[group]}
+            </span>
+            <span className="hidden px-1.5 text-muted-foreground/40 lg:inline">
+              /
+            </span>
+          </>
+        )}
         <span className="font-medium tracking-tight">{pageLabel}</span>
       </nav>
 
       <div className="flex-1" />
 
-      {/* Busca global: entra direto na /albums com o termo aplicado, que e'
-          onde o filtro ja' existe — sem inventar uma tela de resultados. */}
-      <form
-        role="search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const q = term.trim();
-          router.push(q ? `/albums?q=${encodeURIComponent(q)}` : "/albums");
-        }}
-        className="glass-field hidden h-9 items-center gap-2 rounded-xl px-3 lg:flex lg:w-64 xl:w-80"
+      {/* Gatilho do command palette. Era um campo de busca que so' sabia
+          jogar o termo na /albums; o palette busca album E navega, entao o
+          que fica aqui e' o gatilho — com o atalho a' vista, que e' como a
+          pessoa aprende que ele existe. */}
+      <button
+        type="button"
+        onClick={openCommandPalette}
+        className="glass-field hidden h-9 items-center gap-2 rounded-xl pl-3 pr-2 text-left transition-colors hover:border-[hsl(var(--brand-blue)/0.35)] lg:flex lg:w-64 xl:w-72"
       >
         <Search
           className="h-4 w-4 shrink-0 text-muted-foreground/60"
           weight="regular"
           aria-hidden="true"
         />
-        <input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder="Buscar formando, turma..."
-          aria-label="Buscar álbuns"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-        />
-      </form>
+        <span className="flex-1 truncate text-sm text-muted-foreground/70">
+          Buscar ou navegar
+        </span>
+        <kbd className="shrink-0 rounded-md border border-[var(--chip-brd)] bg-[var(--chip)] px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {cmdKey}K
+        </kbd>
+      </button>
+
+      {/* Abaixo de lg o campo nao cabe — vira so' o icone, com o mesmo alvo
+          de 44px dos demais botoes de icone. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 lg:hidden"
+        onClick={openCommandPalette}
+        aria-label="Buscar ou navegar"
+      >
+        <Search className="h-[18px] w-[18px] text-muted-foreground" weight="regular" />
+      </Button>
 
       <span className="glass-chip hidden items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium xl:inline-flex">
         <span
@@ -159,6 +193,14 @@ export function Header({
               </p>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => openCommandPalette()}>
+            <Search className="mr-2 h-4 w-4" />
+            Buscar ou navegar
+            <span className="ml-auto text-xs text-muted-foreground">
+              {cmdKey}K
+            </span>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={isPending}

@@ -1,17 +1,15 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import Link from "next/link";
-import { FolderOpen, ImageOff, Copy } from "@/lib/icons";
+import { Copy, FolderOpen, ImageOff, type AppIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
-import { ALBUM_STATUS_LABELS, ALBUM_STATUS_STYLES } from "@/lib/constants";
+import { ALBUM_STATUS_LABELS } from "@/lib/constants";
 import type { AlbumStatus, AlbumType, UserRow } from "@/types/database";
 import { FilaQueue } from "@/components/fila/fila-queue";
+import {
+  WorkloadCard,
+  type WorkloadSlice,
+} from "@/components/fila/workload-card";
 import {
   computePaymentCycleForInstant,
   formatDate,
@@ -19,7 +17,19 @@ import {
 } from "@/lib/financial";
 import { EmptyState } from "@/components/ui/empty-state";
 
-type ActiveStatus = Extract<AlbumStatus, "baixado" | "descartado" | "editando" | "montado" | "enviado">;
+type ActiveStatus = Extract<
+  AlbumStatus,
+  "baixado" | "descartado" | "editando" | "montado" | "enviado"
+>;
+
+/** Ordem do fluxo + a cor de cada etapa, fonte unica em globals.css. */
+const ACTIVE_FLOW: { status: ActiveStatus; token: string }[] = [
+  { status: "baixado", token: "--status-idle" },
+  { status: "editando", token: "--status-active" },
+  { status: "montado", token: "--status-assembled" },
+  { status: "enviado", token: "--status-sent" },
+  { status: "descartado", token: "--status-excluded" },
+];
 
 interface UserStats {
   baixado: number;
@@ -29,6 +39,15 @@ interface UserStats {
   enviado: number;
   total: number;
 }
+
+const ZERO: UserStats = {
+  baixado: 0,
+  descartado: 0,
+  editando: 0,
+  montado: 0,
+  enviado: 0,
+  total: 0,
+};
 
 type QueueAlbum = {
   id: string;
@@ -72,25 +91,37 @@ export default async function FilaPage() {
   // while status sits in baixado/editando/montado) gets carried into the
   // current cycle one hop at a time by the daily cron job instead of being
   // pulled in at query time — see /api/cron/cleanup-inutilizaveis.
-  const rawAlbums = (albumsRes.data ?? []) as (QueueAlbum & { cycle_start: string | null })[];
+  const rawAlbums = (albumsRes.data ?? []) as (QueueAlbum & {
+    cycle_start: string | null;
+  })[];
   const allAlbums = rawAlbums.filter((a) => a.cycle_start === currentCycleStart);
-  const users = (usersRes.data ?? []) as Pick<UserRow, "id" | "name" | "active">[];
+  const users = (usersRes.data ?? []) as Pick<
+    UserRow,
+    "id" | "name" | "active"
+  >[];
 
-  const inutilizavelStatuses = new Set<AlbumStatus>(["fotos_insuficientes", "duplicado"]);
-  const activeAlbums = allAlbums.filter((a) => !inutilizavelStatuses.has(a.status));
-  const inutilizaveis = allAlbums.filter((a) => inutilizavelStatuses.has(a.status));
-  const fotosInsuf = inutilizaveis.filter((a) => a.status === "fotos_insuficientes");
+  const inutilizavelStatuses = new Set<AlbumStatus>([
+    "fotos_insuficientes",
+    "duplicado",
+  ]);
+  const activeAlbums = allAlbums.filter(
+    (a) => !inutilizavelStatuses.has(a.status),
+  );
+  const inutilizaveis = allAlbums.filter((a) =>
+    inutilizavelStatuses.has(a.status),
+  );
+  const fotosInsuf = inutilizaveis.filter(
+    (a) => a.status === "fotos_insuficientes",
+  );
   const copias = inutilizaveis.filter((a) => a.status === "duplicado");
 
   const userMap = new Map(users.map((u) => [u.id, u.name]));
 
   // Per-user stats (only active albums)
   const userStats = new Map<string, UserStats>();
-  for (const u of users) {
-    userStats.set(u.id, { baixado: 0, descartado: 0, editando: 0, montado: 0, enviado: 0, total: 0 });
-  }
+  for (const u of users) userStats.set(u.id, { ...ZERO });
   for (const a of activeAlbums) {
-    const s = userStats.get(a.responsible_id) ?? { baixado: 0, descartado: 0, editando: 0, montado: 0, enviado: 0, total: 0 };
+    const s = userStats.get(a.responsible_id) ?? { ...ZERO };
     s.total += 1;
     const st = a.status as ActiveStatus;
     if (st in s) s[st] += 1;
@@ -101,48 +132,93 @@ export default async function FilaPage() {
 
   // Não-criadores só veem os próprios álbuns (já garantido pelo RLS) — os
   // cartões de carga de trabalho seguem a mesma regra, mostrando só o deles.
-  const visibleUsers = isCriador ? users : users.filter((u) => u.id === profile.id);
+  const visibleUsers = isCriador
+    ? users
+    : users.filter((u) => u.id === profile.id);
+
+  const withWork = visibleUsers
+    .map((u) => ({ user: u, stats: userStats.get(u.id) ?? ZERO }))
+    .filter((r) => r.stats.total > 0)
+    .sort((a, b) => b.stats.total - a.stats.total);
+
+  // Quem esta' sem fila nao ganha um card do mesmo tamanho de quem tem 210
+  // albuns — vira uma linha. A grade antiga dava peso igual a "0" e a "210",
+  // e sobrava um buraco no meio quando o numero de pessoas nao era multiplo
+  // de quatro.
+  const idle = visibleUsers.filter(
+    (u) => (userStats.get(u.id) ?? ZERO).total === 0,
+  );
+
+  const busiest = withWork[0];
+  const busiestShare =
+    busiest && activeAlbums.length > 0
+      ? Math.round((busiest.stats.total / activeAlbums.length) * 100)
+      : 0;
+
+  function slicesFor(stats: UserStats): WorkloadSlice[] {
+    return ACTIVE_FLOW.map((f) => ({
+      status: f.status as AlbumStatus,
+      count: stats[f.status],
+      token: f.token,
+    })).filter((s) => s.count > 0);
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl tracking-tight">Fila de trabalho</h1>
-        <p className="text-sm text-muted-foreground">
-          Ciclo {currentCycle.label} · {activeAlbums.length} álbum{activeAlbums.length !== 1 ? "ns" : ""} em andamento
+      <header>
+        <p className="eyebrow flex flex-wrap items-center gap-x-2 text-muted-foreground/60">
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: "hsl(var(--success))" }}
+            aria-hidden="true"
+          />
+          Ciclo {currentCycle.label}
+          <span aria-hidden="true" className="text-muted-foreground/30">
+            ·
+          </span>
+          Pagamento em {formatDate(currentCycle.paymentDate)}
         </p>
-      </div>
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
+          Fila de trabalho
+        </h1>
+        <p className="mt-1.5 max-w-[68ch] text-sm text-muted-foreground">
+          {activeAlbums.length === 0 ? (
+            <>Nenhum álbum em andamento neste ciclo.</>
+          ) : (
+            <>
+              {activeAlbums.length} álbu
+              {activeAlbums.length === 1 ? "m" : "ns"} em andamento
+              {busiest && isCriador ? (
+                <>
+                  , {busiestShare}% deles com {busiest.user.name.split(" ")[0]}
+                </>
+              ) : null}
+              . Só entram aqui os álbuns cujo ciclo de início é o atual.
+            </>
+          )}
+        </p>
+      </header>
 
-      {/* Per-user workload cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {visibleUsers.map((u) => {
-          const s = userStats.get(u.id) ?? { baixado: 0, descartado: 0, editando: 0, montado: 0, enviado: 0, total: 0 };
-          return (
-            <Card key={u.id} className={s.total === 0 ? "opacity-50" : ""}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">{u.name}</CardTitle>
-                  <span className="text-2xl font-bold tabular-nums">{s.total}</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {s.total === 0 ? (
-                  <span className="text-xs text-muted-foreground">Nenhum álbum</span>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {(["baixado", "descartado", "editando", "montado", "enviado"] as ActiveStatus[]).map((st) =>
-                      s[st] > 0 ? (
-                        <span key={st} className={`text-xs px-1.5 py-0.5 rounded w-fit ${ALBUM_STATUS_STYLES[st]}`}>
-                          {s[st]} {ALBUM_STATUS_LABELS[st].toLowerCase()}{s[st] !== 1 && st !== "editando" ? "s" : ""}
-                        </span>
-                      ) : null,
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Carga por pessoa */}
+      {withWork.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {withWork.map(({ user, stats }) => (
+            <WorkloadCard
+              key={user.id}
+              name={user.name}
+              total={stats.total}
+              slices={slicesFor(stats)}
+            />
+          ))}
+        </div>
+      )}
+
+      {idle.length > 0 && (
+        <p className="glass-chip flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-3.5 py-2.5 text-xs text-muted-foreground">
+          <span className="eyebrow text-muted-foreground/55">Sem fila</span>
+          <span>{idle.map((u) => u.name).join(" · ")}</span>
+        </p>
+      )}
 
       {/* Active queue */}
       {activeAlbums.length > 0 ? (
@@ -164,69 +240,86 @@ export default async function FilaPage() {
         />
       )}
 
-      {/* Inutilizáveis — Fotos insuficientes */}
-      {fotosInsuf.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <ImageOff className="h-4 w-4 text-orange-500" />
-            <h2 className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-              Fotos insuficientes
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              ({fotosInsuf.length}) — não irão para a fila de eventos · removidos ao fim do ciclo
-            </span>
-          </div>
-          <div className="rounded-lg border border-orange-200/60 dark:border-orange-900/40 overflow-hidden">
-            {fotosInsuf.map((a, idx) => (
-              <div
-                key={a.id}
-                className={`flex items-center gap-3 px-4 py-2.5 bg-orange-50/50 dark:bg-orange-950/20 ${idx < fotosInsuf.length - 1 ? "border-b border-orange-100 dark:border-orange-900/30" : ""}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{a.student_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {userMap.get(a.responsible_id) ?? "—"}
-                    {a.class_code && <span className="ml-1 opacity-60">· {a.class_code}</span>}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0">{a.faculty}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Inutilizáveis — Cópias / Duplicados */}
-      {copias.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Copy className="h-4 w-4 text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-              Cópias / Duplicados
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              ({copias.length}) — removidos ao fim do ciclo
-            </span>
-          </div>
-          <div className="rounded-lg border border-slate-200/60 dark:border-slate-700/40 overflow-hidden">
-            {copias.map((a, idx) => (
-              <div
-                key={a.id}
-                className={`flex items-center gap-3 px-4 py-2.5 bg-slate-50/50 dark:bg-slate-900/20 ${idx < copias.length - 1 ? "border-b border-slate-100 dark:border-slate-800/30" : ""}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{a.student_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {userMap.get(a.responsible_id) ?? "—"}
-                    {a.class_code && <span className="ml-1 opacity-60">· {a.class_code}</span>}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0">{a.faculty}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Inutilizaveis. As cores vem dos tokens de status (--status-problem /
+          --status-excluded), nao de utilitarios soltos do Tailwind (orange / slate): sao
+          os mesmos status que a tabela e os badges pintam, e ter dois mapas
+          de cor pro mesmo status foi exatamente o bug que a fonte unica em
+          constants.ts resolveu. */}
+      <InutilizavelGroup
+        icon={ImageOff}
+        token="--status-problem"
+        title={ALBUM_STATUS_LABELS.fotos_insuficientes}
+        note="não irão para a fila de eventos · removidos ao fim do ciclo"
+        rows={fotosInsuf}
+        userMap={userMap}
+      />
+      <InutilizavelGroup
+        icon={Copy}
+        token="--status-excluded"
+        title={ALBUM_STATUS_LABELS.duplicado}
+        note="removidos ao fim do ciclo"
+        rows={copias}
+        userMap={userMap}
+      />
     </div>
+  );
+}
+
+function InutilizavelGroup({
+  icon: Icon,
+  token,
+  title,
+  note,
+  rows,
+  userMap,
+}: {
+  icon: AppIcon;
+  token: string;
+  title: string;
+  note: string;
+  rows: (QueueAlbum & { cycle_start: string | null })[];
+  userMap: Map<string, string>;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Icon className="h-4 w-4" style={{ color: `hsl(var(${token}))` }} />
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: `hsl(var(${token}))` }}
+        >
+          {title}
+        </h2>
+        <span className="text-xs text-muted-foreground">
+          ({rows.length}) — {note}
+        </span>
+      </div>
+      <div className="glass overflow-hidden rounded-2xl">
+        <div className="divide-y divide-[var(--brd)]">
+          {rows.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: `hsl(var(${token}))` }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{a.student_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {userMap.get(a.responsible_id) ?? "—"}
+                  {a.class_code && (
+                    <span className="ml-1 opacity-60">· {a.class_code}</span>
+                  )}
+                </p>
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {a.faculty}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
