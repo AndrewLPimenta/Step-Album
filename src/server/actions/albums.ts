@@ -427,7 +427,7 @@ export async function deleteProblemAction(
 }
 
 export async function syncKazIdsAction(
-  items: Array<{ class_code: string; student_code: string; kaz_id: string }>,
+  items: Array<{ class_code: string; student_code: string; kaz_id: string; student_name?: string }>,
 ): Promise<ActionResult<{ updated: number; notFound: number }>> {
   const session = await requireUser();
   const validItems = items.filter((i) => i.class_code && i.student_code && i.kaz_id);
@@ -437,13 +437,35 @@ export async function syncKazIdsAction(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabaseAny = supabase as any;
+  const norm = (s: string | null | undefined) =>
+    (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+  // Um kaz_id identifica UM formando. Turma+codigo nao e' unico: formandos
+  // sem codigo no Kaz vem todos como "0000", e casar so' por codigo fazia
+  // cada linha sobrescrever a turma inteira com o mesmo kaz_id. Agora so'
+  // grava quando o alvo e' exatamente um album; se o codigo casa varios,
+  // desempata pelo nome do formando; se ainda for ambiguo, pula.
+  let skipped = 0;
   const results = await Promise.all(
     validItems.map(async (item) => {
+      const { data: matches } = await supabaseAny
+        .from("albums")
+        .select("id, student_name")
+        .eq("class_code", item.class_code)
+        .eq("student_code", item.student_code);
+      let targets = (matches ?? []) as Array<{ id: string; student_name: string }>;
+      if (targets.length > 1) {
+        const want = norm(item.student_name);
+        targets = want ? targets.filter((t) => norm(t.student_name) === want) : [];
+      }
+      if (targets.length !== 1) {
+        if ((matches ?? []).length > 0) skipped++;
+        return 0;
+      }
       const { data } = await supabaseAny
         .from("albums")
         .update({ kaz_id: item.kaz_id })
-        .eq("class_code", item.class_code)
-        .eq("student_code", item.student_code)
+        .eq("id", targets[0].id)
         .select("id");
       return (data as Array<{ id: string }> | null)?.length ?? 0;
     }),
@@ -454,6 +476,7 @@ export async function syncKazIdsAction(
   await logAudit(session.profile.id, "album.sync_kaz_ids", "album", null, {
     count: validItems.length,
     updated,
+    skipped_ambiguous: skipped,
   });
 
   revalidatePath("/albums");

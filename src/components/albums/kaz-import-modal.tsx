@@ -214,7 +214,7 @@ export function KazImportModal({
   function handleSync() {
     const itemsWithId = rows
       .filter((r) => r.kaz_id)
-      .map((r) => ({ class_code: r.class_code, student_code: r.student_code, kaz_id: r.kaz_id! }));
+      .map((r) => ({ class_code: r.class_code, student_code: r.student_code, student_name: r.student_name, kaz_id: r.kaz_id! }));
     if (!itemsWithId.length) {
       toast.error("Nenhum álbum neste lote tem ID Kaz.");
       return;
