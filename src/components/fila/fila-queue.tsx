@@ -57,6 +57,11 @@ const NEXT_STATUS: Partial<Record<AlbumStatus, AlbumStatus>> = {
   enviado: "concluido",
 };
 
+// Quantos downloads do Kaz abrir de cada vez, e a pausa entre os blocos.
+// 6 = limite de conexoes simultaneas do Chrome por servidor; se ainda vier
+// .html vazio, aumente a pausa.
+const KAZ_BATCH_SIZE = 6;
+const KAZ_BATCH_DELAY_MS = 10000;
 const TYPE_FILTER_ALL = "todos";
 const RESPONSIBLE_FILTER_ALL = "todos";
 const STATUS_FILTER_ALL = "todos";
@@ -95,6 +100,7 @@ export function FilaQueue({ albums, users }: Props) {
   const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const lastClickedIndexRef = useRef<number | null>(null);
+  const downloadRunRef = useRef(0);
 
   // Instant feedback on bulk status/reassign, hand-rolled since useOptimistic
   // needs React 19 (this app is on 18). Overrides are applied on top of
@@ -292,22 +298,60 @@ export function FilaQueue({ albums, users }: Props) {
       return;
     }
 
-    // Open synchronously via hidden <a> — avoids popup blocker
-    toDownload.forEach((kazId) => {
-      const numericId = kazId.replace(/^row_/, "");
-      const link = document.createElement("a");
-      link.href = KAZ_DOWNLOAD_URL(numericId);
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
+    const urls = toDownload.map((kazId) => KAZ_DOWNLOAD_URL(kazId.replace(/^row_/, "")));
+    if (missing > 0) {
+      toast.message(`${missing} álbum${missing !== 1 ? "ns" : ""} sem código do Kaz ignorado${missing !== 1 ? "s" : ""}.`);
+    }
+    openKazDownloads(urls);
+  }
 
-    const msg = missing > 0
-      ? `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. ${missing} sem código ignorado${missing !== 1 ? "s" : ""}.`
-      : `${toDownload.length} download${toDownload.length !== 1 ? "s" : ""} iniciado${toDownload.length !== 1 ? "s" : ""}. Certifique-se de estar logado no Kaz.`;
-    toast.success(msg);
+  // O Kaz responde vazio (salva um .html de 0 bytes) quando recebe dezenas de
+  // downloads no mesmo instante — sozinho o mesmo link entrega o ZIP. Por isso
+  // abre em blocos pequenos com pausa entre eles. O primeiro bloco sai dentro
+  // do clique; os seguintes dependem dos pop-ups liberados para o site.
+  function openKazDownloads(urls: string[], startAt = 0) {
+    const run = ++downloadRunRef.current;
+    const total = urls.length;
+    const toastId = "kaz-download";
+    let i = startAt;
+
+    const stop = () => {
+      downloadRunRef.current++;
+      toast.message(`Downloads parados em ${i}/${total}.`, { id: toastId, duration: 5000 });
+    };
+
+    const nextBatch = () => {
+      if (run !== downloadRunRef.current) return;
+      const end = Math.min(i + KAZ_BATCH_SIZE, total);
+      for (; i < end; i++) {
+        const w = window.open(urls[i], "_blank");
+        if (!w) {
+          const from = i;
+          toast.error(
+            `O navegador bloqueou a partir do ${from + 1}º de ${total}. Libere os pop-ups deste site e clique em Continuar.`,
+            {
+              id: toastId,
+              duration: Infinity,
+              action: { label: `Continuar (${total - from})`, onClick: () => openKazDownloads(urls, from) },
+            },
+          );
+          return;
+        }
+        try { w.opener = null; } catch { /* cross-origin */ }
+      }
+      if (i >= total) {
+        toast.success(`${total} download${total !== 1 ? "s" : ""} aberto${total !== 1 ? "s" : ""}.`, { id: toastId, duration: 6000 });
+        return;
+      }
+      toast.loading(`Baixando do Kaz… ${i}/${total}`, {
+        id: toastId,
+        duration: Infinity,
+        action: { label: "Parar", onClick: stop },
+      });
+      setTimeout(nextBatch, KAZ_BATCH_DELAY_MS);
+    };
+
+    nextBatch();
   }
 
   function handleBulkReassign(userId: string) {
